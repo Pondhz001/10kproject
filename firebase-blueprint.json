@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "Tree": {
+      "title": "Tree",
+      "description": "Information about a planted tree and its care history",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the tree"
+        },
+        "index": {
+          "type": "number",
+          "description": "The custom index/number assigned to the tree on the grid"
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "Name of the person who donated/bought the tree"
+        },
+        "ownerPhone": {
+          "type": "string",
+          "description": "Phone number of the owner/donor"
+        },
+        "plantedAt": {
+          "type": "string",
+          "description": "ISO timestamp of when the tree was planted"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current growth status (e.g., Seedling, Growing, Young Tree, Mature)"
+        },
+        "height": {
+          "type": "number",
+          "description": "Height in centimeters"
+        },
+        "carbonOffset": {
+          "type": "number",
+          "description": "Estimated CO2 offset in kg"
+        },
+        "careHistory": {
+          "type": "array",
+          "description": "History of growth tracking and watering updates"
+        }
+      },
+      "required": ["id", "index", "ownerName", "ownerPhone", "plantedAt", "status", "height", "carbonOffset"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "An order of trees to be planted",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the order"
+        },
+        "donorName": {
+          "type": "string",
+          "description": "Name of the donor"
+        },
+        "donorPhone": {
+          "type": "string",
+          "description": "Phone number of the donor"
+        },
+        "treeCount": {
+          "type": "number",
+          "description": "Number of trees ordered"
+        },
+        "selectedTreeIndexes": {
+          "type": "array",
+          "description": "Specific indices selected on the grid"
+        },
+        "status": {
+          "type": "string",
+          "description": "Order status (Pending, Paid)"
+        },
+        "slipVerified": {
+          "type": "boolean",
+          "description": "Whether the slip has been verified"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of order creation"
+        }
+      },
+      "required": ["id", "donorName", "donorPhone", "treeCount", "selectedTreeIndexes", "status", "slipVerified", "createdAt"]
+    }
+  },
+  "firestore": {
+    "trees": {
+      "schema": {
+        "$ref": "#/entities/Tree"
+      },
+      "description": "Collection of planted trees"
+    },
+    "orders": {
+      "schema": {
+        "$ref": "#/entities/Order"
+      },
+      "description": "Collection of tree purchase/donation orders"
+    }
+  }
+}

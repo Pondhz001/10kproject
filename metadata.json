@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Muen Kla Pa Khiao",
+  "description": "Plant teak for 100฿ with professional care, secure QR payments, and automated slip verification for a greener future.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

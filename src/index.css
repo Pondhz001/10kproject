@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  header, main, footer, section, .fixed:not(.print-container) {
+    display: none !important;
+  }
+  .print-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 2rem !important;
+    border: 8px double #d97706 !important;
+    background: #fafaf9 !important;
+    color: #1c1917 !important;
+    box-shadow: none !important;
+    visibility: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+}

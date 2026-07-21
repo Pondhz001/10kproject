@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 1. Trees collection rules
+    match /trees/{treeId} {
+      allow read: if true; // Publicly readable for rendering the forest map
+      
+      allow create: if isSignedIn() 
+        && isValidId(treeId)
+        && incoming().id == treeId
+        && incoming().index is number
+        && incoming().ownerName is string
+        && incoming().ownerName.size() <= 100
+        && incoming().ownerPhone is string
+        && incoming().ownerPhone.size() <= 20
+        && incoming().plantedAt is string
+        && incoming().status in ['Seedling', 'Growing', 'Young Tree', 'Mature']
+        && incoming().height is number
+        && incoming().carbonOffset is number;
+
+      // Allow updates to height, status, carbonOffset, and careHistory
+      // Only authenticated users can perform this
+      allow update: if isSignedIn()
+        && incoming().height is number
+        && incoming().status in ['Seedling', 'Growing', 'Young Tree', 'Mature']
+        && incoming().carbonOffset is number
+        && incoming().careHistory is list
+        && incoming().ownerName == existing().ownerName
+        && incoming().ownerPhone == existing().ownerPhone
+        && incoming().id == existing().id
+        && incoming().index == existing().index;
+
+      allow delete: if false; // Deletion of trees is strictly prohibited
+    }
+
+    // 2. Orders collection rules
+    match /orders/{orderId} {
+      // Users can only read their own orders
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && isValidId(orderId)
+        && incoming().id == orderId
+        && incoming().donorName is string
+        && incoming().donorName.size() <= 100
+        && incoming().donorPhone is string
+        && incoming().donorPhone.size() <= 20
+        && incoming().treeCount is number
+        && incoming().treeCount > 0
+        && incoming().selectedTreeIndexes is list
+        && incoming().status in ['Pending', 'Paid', 'Failed']
+        && incoming().slipVerified is bool
+        && incoming().createdAt is string;
+
+      // Only allow updating status and slipVerified (no changing donor info or tree count!)
+      allow update: if isSignedIn()
+        && incoming().status in ['Pending', 'Paid', 'Failed']
+        && incoming().slipVerified is bool
+        && incoming().donorName == existing().donorName
+        && incoming().donorPhone == existing().donorPhone
+        && incoming().treeCount == existing().treeCount
+        && incoming().id == existing().id;
+
+      allow delete: if false; // Deletion of orders is strictly prohibited
+    }
+  }
+}
