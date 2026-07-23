@@ -5,12 +5,13 @@ import PlantingPortal from './components/PlantingPortal';
 import CertificateCanvas from './components/CertificateCanvas';
 import PoetryNarrator from './components/PoetryNarrator';
 import AboutCampaign from './components/AboutCampaign';
-import { Trees, Search, Shovel, Trees as EcoIcon, Sparkles, Scale, Users, CheckCircle, Heart, Info, Lock, Printer, ShieldCheck, X, Mail, Phone as PhoneIcon, MessageSquare, Info as InfoIcon, FileText, Globe, Heart as HeartIcon } from 'lucide-react';
+import HomeCampaign from './components/HomeCampaign';
+import { Trees, Search, Shovel, Trees as EcoIcon, Sparkles, Scale, Users, CheckCircle, Heart, Info, Lock, Printer, ShieldCheck, X, Mail, Phone as PhoneIcon, MessageSquare, Info as InfoIcon, FileText, Globe, Heart as HeartIcon, Home } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'map' | 'plant' | 'about'>('map');
+  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'plant' | 'about'>('home');
   const [plantMode, setPlantMode] = useState<'member' | 'admin'>('member');
 
   // Admin Access State
@@ -164,8 +165,11 @@ export default function App() {
       <header className="border-b border-emerald-900/10 bg-white/85 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           
-          {/* Logo Brand */}
-          <div className="flex items-center gap-3 group">
+          {/* Logo Brand (Clickable to Home) */}
+          <div 
+            onClick={() => setActiveTab('home')}
+            className="flex items-center gap-3 group cursor-pointer hover:opacity-90 transition-all"
+          >
             <div className="p-2.5 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl shadow-lg shadow-emerald-950/10 group-hover:scale-105 transition-transform">
               <Trees className="w-5 h-5" />
             </div>
@@ -200,6 +204,18 @@ export default function App() {
             )}
 
             <nav className="flex gap-1.5 bg-white p-1.5 rounded-2xl border border-emerald-900/10 shadow-sm">
+              <button
+                onClick={() => setActiveTab('home')}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+                  activeTab === 'home'
+                    ? 'bg-emerald-600 text-white shadow-sm border border-emerald-500/10'
+                    : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
+                }`}
+              >
+                <Home className="w-4 h-4 text-emerald-300" />
+                หน้าแรก
+              </button>
+
               <button
                 onClick={() => setActiveTab('map')}
                 className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
@@ -260,10 +276,12 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Campaign Stats Dashboard (Bento Grid) */}
-      <section className="bg-[#e9f0e9] border-b border-emerald-900/5 py-8 relative overflow-hidden">
-        {/* Decorative elements */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-600/5 rounded-full blur-3xl pointer-events-none" />
+      {/* Main Campaign Stats Dashboard (Bento Grid) - Conditionally hidden on Home tab */}
+      {activeTab !== 'home' && (
+        <section className="bg-[#e9f0e9] border-b border-emerald-900/5 py-8 relative overflow-hidden">
+          {/* Decorative elements */}
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-600/5 rounded-full blur-3xl pointer-events-none" />
+          
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" id="campaign-bento-grid">
@@ -343,6 +361,7 @@ export default function App() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Main Feature Content Router Panel */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -560,6 +579,18 @@ export default function App() {
             transition={{ duration: 0.25 }}
             className="h-full"
           >
+            {activeTab === 'home' && (
+              <HomeCampaign 
+                stats={stats}
+                onEnterCampaign={(tab) => {
+                  if (tab === 'plant') {
+                    setPlantMode('member');
+                  }
+                  setActiveTab(tab);
+                }}
+              />
+            )}
+
             {activeTab === 'map' && (
               <ForestMap
                 trees={trees}
