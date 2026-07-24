@@ -202,38 +202,7 @@ async function startServer() {
     }
   });
 
-  // Sync user profile
-  app.post('/api/user/sync', async (req, res) => {
-    try {
-      const userProfile = req.body;
-      if (!userProfile || !userProfile.uid) {
-        return res.status(400).json({ error: 'ไม่พบข้อมูลผู้ใช้' });
-      }
-      const saved = await LocalDb.saveUserProfile(userProfile);
-      res.json({ success: true, user: saved });
-    } catch (e) {
-      res.status(500).json({ error: 'Failed to sync user profile' });
-    }
-  });
 
-  // Get user trees by userId or phone or ownerName
-  app.get('/api/user/trees', async (req, res) => {
-    try {
-      const { userId, phone, name } = req.query;
-      const trees = await LocalDb.getTrees();
-
-      const userTrees = trees.filter(t => {
-        if (userId && t.userId === String(userId)) return true;
-        if (phone && t.ownerPhone && t.ownerPhone.replace(/\D/g, '') === String(phone).replace(/\D/g, '')) return true;
-        if (name && t.ownerName && t.ownerName.trim().toLowerCase().includes(String(name).trim().toLowerCase())) return true;
-        return false;
-      });
-
-      res.json({ success: true, count: userTrees.length, trees: userTrees });
-    } catch (e) {
-      res.status(500).json({ error: 'Failed to fetch user trees' });
-    }
-  });
 
   // Update Tree Care (Admin / Tracker portal)
   app.post('/api/trees/:id/care', async (req, res) => {

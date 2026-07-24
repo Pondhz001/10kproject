@@ -1,39 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { Tree, UserProfile } from '../types';
+import { Tree } from '../types';
 import { Trees, Calendar, Award, Image as ImageIcon, ChevronRight, Phone, ShieldCheck, Search, Sparkles, UserCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CertificateCanvas from './CertificateCanvas';
 
 interface UserDashboardProps {
-  user?: UserProfile | null;
-  onLoginRequest?: () => void;
   trees?: Tree[];
   onViewCertificate?: (tree: Tree) => void;
   onGoToPlanting?: () => void;
 }
 
-export default function UserDashboard({ user, onLoginRequest, trees = [], onViewCertificate, onGoToPlanting }: UserDashboardProps) {
-  const [searchPhone, setSearchPhone] = useState(user?.phone || '');
+export default function UserDashboard({ trees = [], onViewCertificate, onGoToPlanting }: UserDashboardProps) {
+  const [searchPhone, setSearchPhone] = useState('');
   const [userTrees, setUserTrees] = useState<Tree[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCertTree, setSelectedCertTree] = useState<Tree | null>(null);
 
   useEffect(() => {
     fetchUserTrees();
-  }, [user, trees]);
+  }, [trees]);
 
   const fetchUserTrees = async () => {
     setLoading(true);
     try {
       let filtered: Tree[] = [];
-      if (user) {
-        // Filter trees by userId, user email/name, or phone if available
-        filtered = trees.filter(t => 
-          (t.userId && t.userId === user.uid) ||
-          (user.phone && t.ownerPhone && t.ownerPhone.replace(/\D/g, '') === user.phone.replace(/\D/g, '')) ||
-          (user.displayName && t.ownerName && t.ownerName.trim().toLowerCase().includes(user.displayName.trim().toLowerCase()))
-        );
-      }
 
       // If user provided a phone number search or searchPhone matches
       if (searchPhone.trim()) {
@@ -76,37 +66,23 @@ export default function UserDashboard({ user, onLoginRequest, trees = [], onView
         
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            {user?.photoURL ? (
-              <img src={user.photoURL} alt={user.displayName} className="w-16 h-16 rounded-2xl border-2 border-emerald-400/50 object-cover shadow-lg" />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-emerald-700/80 border-2 border-emerald-400/30 flex items-center justify-center text-emerald-200 shadow-lg">
-                <Trees className="w-8 h-8" />
-              </div>
-            )}
+            <div className="w-16 h-16 rounded-2xl bg-emerald-700/80 border-2 border-emerald-400/30 flex items-center justify-center text-emerald-200 shadow-lg">
+              <Trees className="w-8 h-8" />
+            </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono uppercase bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-400/30 font-bold">
-                  {user ? (user.provider === 'line' ? 'LINE Member' : 'Google Member') : 'ค้นหาด้วยเบอร์โทร'}
+                  ค้นหาด้วยเบอร์โทร
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">
-                {user ? user.displayName : 'ระบบบันทึกและติดตามกล้าไม้ส่วนบุคคล'}
+                ระบบบันทึกและติดตามกล้าไม้ส่วนบุคคล
               </h1>
               <p className="text-xs text-emerald-200/90 font-mono mt-1">
-                {user ? `บัญชีเชื่อมต่อ: ${user.email || user.lineUserId || 'LINE'}` : 'ตรวจสอบสถานะ รูปการเติบโต และใบประกาศกล้าไม้สักของคุณ'}
+                ตรวจสอบสถานะ รูปการเติบโต และใบประกาศกล้าไม้สักของคุณ
               </p>
             </div>
           </div>
-
-          {!user && (
-            <button
-              onClick={onLoginRequest}
-              className="px-5 py-3 bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold rounded-2xl shadow-lg transition-all flex items-center gap-2 text-sm shrink-0 cursor-pointer"
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>เข้าสู่ระบบเพื่อผูกบัญชี</span>
-            </button>
-          )}
         </div>
       </div>
 
