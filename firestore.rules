@@ -23,66 +23,105 @@ service cloud.firestore {
     function existing() {
       return resource.data;
     }
+    
+    // Validation for UserProfile
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'provider'])
+        && data.uid is string && data.uid.size() <= 128
+        && data.displayName is string && data.displayName.size() <= 100
+        && data.provider is string && data.provider in ['google', 'line', 'guest']
+        && (!data.keys().hasAny(['email']) || (data.email is string && data.email.size() <= 150))
+        && (!data.keys().hasAny(['photoURL']) || (data.photoURL is string && data.photoURL.size() <= 1000))
+        && (!data.keys().hasAny(['phone']) || (data.phone is string && data.phone.size() <= 20))
+        && (!data.keys().hasAny(['lineUserId']) || (data.lineUserId is string && data.lineUserId.size() <= 128))
+        && (!data.keys().hasAny(['pictureUrl']) || (data.pictureUrl is string && data.pictureUrl.size() <= 1000))
+        && (!data.keys().hasAny(['createdAt']) || (data.createdAt is string));
+    }
 
-    // 1. Trees collection rules
+    // Validation for Tree
+    function isValidTree(data) {
+      return data.keys().hasAll(['id', 'index', 'ownerName', 'ownerPhone', 'plantedAt', 'status', 'height', 'carbonOffset'])
+        && data.id is string
+        && data.index is number
+        && data.ownerName is string && data.ownerName.size() <= 100
+        && data.ownerPhone is string && data.ownerPhone.size() <= 20
+        && data.plantedAt is string
+        && data.status in ['Seedling', 'Growing', 'Young Tree', 'Mature']
+        && data.height is number
+        && data.carbonOffset is number
+        && (!data.keys().hasAny(['ownerOrganization']) || (data.ownerOrganization is string && data.ownerOrganization.size() <= 150))
+        && (!data.keys().hasAny(['userId']) || (data.userId is string && data.userId.size() <= 128))
+        && (!data.keys().hasAny(['careHistory']) || data.careHistory is list);
+    }
+    
+    // Validation for Order
+    function isValidOrder(data) {
+      return data.keys().hasAll(['id', 'donorName', 'donorPhone', 'treeCount', 'amount', 'selectedTreeIndexes', 'status', 'slipVerified', 'createdAt'])
+        && data.id is string
+        && data.donorName is string && data.donorName.size() <= 100
+        && data.donorPhone is string && data.donorPhone.size() <= 20
+        && data.treeCount is number && data.treeCount > 0
+        && data.amount is number && data.amount >= 0
+        && data.selectedTreeIndexes is list
+        && data.status in ['Pending', 'Paid', 'Failed']
+        && data.slipVerified is bool
+        && data.createdAt is string
+        && (!data.keys().hasAny(['donorOrganization']) || (data.donorOrganization is string && data.donorOrganization.size() <= 150))
+        && (!data.keys().hasAny(['userId']) || (data.userId is string && data.userId.size() <= 128))
+        && (!data.keys().hasAny(['treeNames']) || data.treeNames is list);
+    }
+
+    // 1. Users collection rules
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId; // Users can read their own profiles
+      allow create, update: if isSignedIn() 
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && incoming().uid == userId
+        && isValidUserProfile(incoming());
+    }
+
+    // 2. Trees collection rules
     match /trees/{treeId} {
       allow read: if true; // Publicly readable for rendering the forest map
       
       allow create: if isSignedIn() 
         && isValidId(treeId)
         && incoming().id == treeId
-        && incoming().index is number
-        && incoming().ownerName is string
-        && incoming().ownerName.size() <= 100
-        && incoming().ownerPhone is string
-        && incoming().ownerPhone.size() <= 20
-        && incoming().plantedAt is string
-        && incoming().status in ['Seedling', 'Growing', 'Young Tree', 'Mature']
-        && incoming().height is number
-        && incoming().carbonOffset is number;
+        && isValidTree(incoming());
 
       // Allow updates to height, status, carbonOffset, and careHistory
       // Only authenticated users can perform this
       allow update: if isSignedIn()
-        && incoming().height is number
-        && incoming().status in ['Seedling', 'Growing', 'Young Tree', 'Mature']
-        && incoming().carbonOffset is number
-        && incoming().careHistory is list
-        && incoming().ownerName == existing().ownerName
-        && incoming().ownerPhone == existing().ownerPhone
+        && isValidTree(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['height', 'status', 'carbonOffset', 'careHistory'])
         && incoming().id == existing().id
-        && incoming().index == existing().index;
+        && incoming().index == existing().index
+        && incoming().ownerName == existing().ownerName
+        && incoming().ownerPhone == existing().ownerPhone;
 
       allow delete: if false; // Deletion of trees is strictly prohibited
     }
 
-    // 2. Orders collection rules
+    // 3. Orders collection rules
     match /orders/{orderId} {
-      // Users can only read their own orders
+      // Users can read their own orders (we verify by userId if it's there)
       allow read: if isSignedIn();
 
       allow create: if isSignedIn()
         && isValidId(orderId)
         && incoming().id == orderId
-        && incoming().donorName is string
-        && incoming().donorName.size() <= 100
-        && incoming().donorPhone is string
-        && incoming().donorPhone.size() <= 20
-        && incoming().treeCount is number
-        && incoming().treeCount > 0
-        && incoming().selectedTreeIndexes is list
-        && incoming().status in ['Pending', 'Paid', 'Failed']
-        && incoming().slipVerified is bool
-        && incoming().createdAt is string;
+        && isValidOrder(incoming());
 
       // Only allow updating status and slipVerified (no changing donor info or tree count!)
       allow update: if isSignedIn()
-        && incoming().status in ['Pending', 'Paid', 'Failed']
-        && incoming().slipVerified is bool
+        && isValidOrder(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'slipVerified'])
+        && incoming().id == existing().id
         && incoming().donorName == existing().donorName
         && incoming().donorPhone == existing().donorPhone
         && incoming().treeCount == existing().treeCount
-        && incoming().id == existing().id;
+        && incoming().amount == existing().amount;
 
       allow delete: if false; // Deletion of orders is strictly prohibited
     }

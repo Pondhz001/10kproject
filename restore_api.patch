@@ -1,0 +1,236 @@
+--- server.ts
++++ server.ts
+@@ -110,6 +110,230 @@
+     }
+   });
+ 
++  // Campaign Stats
++  app.get('/api/stats', async (req, res) => {
++    try {
++      const trees = await LocalDb.getTrees();
++      // Calculate unique donors by name, since some don't have phone numbers or share the same default '-' phone number
++      const uniqueDonors = new Set(
++        trees.map(t => (t.ownerName || '').trim().toLowerCase()).filter(n => n.length > 0)
++      ).size;
++      const totalCO2Offset = Number(trees.reduce((sum, t) => sum + (t.carbonOffset || 0), 0).toFixed(1));
++
++      res.json({
++        totalTarget: 10000,
++        totalPlanted: trees.length,
++        totalCO2Offset: Number(totalCO2Offset.toFixed(1)),
++        totalDonors: uniqueDonors
++      });
++    } catch (e) {
++      res.status(500).json({ error: 'Failed to fetch statistics' });
++    }
++  });
++
++  // Get all trees
++  app.get('/api/trees', async (req, res) => {
++    try {
++      const trees = await LocalDb.getTrees();
++      res.json(trees);
++    } catch (e) {
++      res.status(500).json({ error: 'Failed to fetch trees' });
++    }
++  });
++
++  // Create order/pledge (Supported via both /api/forest/pledge and /api/orders)
++  const createPledgeHandler = async (req: express.Request, res: express.Response) => {
++    try {
++      const { donorName, organization, donorOrganization, donorPhone, treeCount, selectedTreeIndexes, treeNames, userId } = req.body;
++      if (!donorName || !donorPhone || !treeCount || treeCount < 1) {
++        return res.status(400).json({ error: 'กรุณากรอกข้อมูลชื่อ เบอร์โทรศัพท์ และจำนวนต้นไม้ให้ครบถ้วน' });
++      }
++
++      const org = organization || donorOrganization || '';
++      const amount = treeCount * 100; // 100 THB per tree
++
++      const order = await LocalDb.addOrder({
++        donorName,
++        donorOrganization: org,
++        donorPhone,
++        userId: userId || '',
++        treeCount: Number(treeCount),
++        amount,
++        status: 'Pending',
++        slipVerified: false,
++        selectedTreeIndexes: selectedTreeIndexes || [],
++        treeNames: treeNames || []
++      });
++
++      res.json({
++        success: true,
++        order,
++        message: 'สร้างรายการร่วมปลูกเรียบร้อยแล้ว กรุณาชำระเงินผ่าน QR Code'
++      });
++    } catch (e) {
++      console.error('Error creating pledge order:', e);
++      res.status(500).json({ error: 'ไม่สามารถสร้างรายการร่วมปลูกได้' });
++    }
++  };
++
++  app.post('/api/forest/pledge', createPledgeHandler);
++  app.post('/api/orders', createPledgeHandler);
++
++  // Generate PromptPay QR Code
++  app.post('/api/payment/generate-qr', async (req, res) => {
++    try {
++      const { amount, orderId, phoneNumber } = req.body;
++      const targetAmount = Number(amount) || 100;
++      const targetPhone = phoneNumber || '0817960622';
++
++      const payload = generatePromptPayPayload(targetAmount, targetPhone);
++      const qrImageUrl = await QRCode.toDataURL(payload, { margin: 2, width: 320 });
++
++      res.json({
++        success: true,
++        amount: targetAmount,
++        orderId: orderId || null,
++        payload,
++        qrImageUrl
++      });
++    } catch (e) {
++      console.error('Error generating QR Code:', e);
++      res.status(500).json({ error: 'ไม่สามารถสร้าง QR Code สำหรับชำระเงินได้' });
++    }
++  });
++
++  // Sync user profile
++  app.post('/api/user/sync', async (req, res) => {
++    try {
++      const userProfile = req.body;
++      if (!userProfile || !userProfile.uid) {
++        return res.status(400).json({ error: 'ไม่พบข้อมูลผู้ใช้' });
++      }
++      const saved = await LocalDb.saveUserProfile(userProfile);
++      res.json({ success: true, user: saved });
++    } catch (e) {
++      res.status(500).json({ error: 'Failed to sync user profile' });
++    }
++  });
++
++  // Get user trees by userId or phone or ownerName
++  app.get('/api/user/trees', async (req, res) => {
++    try {
++      const { userId, phone, name } = req.query;
++      const trees = await LocalDb.getTrees();
++
++      const userTrees = trees.filter(t => {
++        if (userId && t.userId === String(userId)) return true;
++        if (phone && t.ownerPhone && t.ownerPhone.replace(/\D/g, '') === String(phone).replace(/\D/g, '')) return true;
++        if (name && t.ownerName && t.ownerName.trim().toLowerCase().includes(String(name).trim().toLowerCase())) return true;
++        return false;
++      });
++
++      res.json({ success: true, count: userTrees.length, trees: userTrees });
++    } catch (e) {
++      res.status(500).json({ error: 'Failed to fetch user trees' });
++    }
++  });
++
++  // Update Tree Care (Admin / Tracker portal)
++  app.post('/api/trees/:id/care', async (req, res) => {
++    try {
++      const { id } = req.params;
++      const { status, height, image, note, date } = req.body;
++
++      if (!status || !height || !note) {
++        return res.status(400).json({ error: 'กรุณากรอกข้อมูลการติดตามให้ครบถ้วน' });
++      }
++
++      const careUpdate: CareUpdate = {
++        date: date || new Date().toISOString().split('T')[0],
++        status,
++        height: Number(height),
++        image: image || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=300&q=80',
++        note
++      };
++
++      const updatedTree = await LocalDb.addCareUpdate(id, careUpdate);
++      if (!updatedTree) {
++        return res.status(404).json({ error: 'ไม่พบข้อมูลต้นกล้าสักที่ระบุ' });
++      }
++
++      res.json(updatedTree);
++    } catch (e) {
++      res.status(500).json({ error: 'Failed to add care update' });
++    }
++  });
++
++  // Update general tree details
++  app.put('/api/trees/:id', async (req, res) => {
++    try {
++      const { id } = req.params;
++      const { ownerName, ownerPhone, status, height, carbonOffset, imageUrl, note, appendNewLog } = req.body;
++
++      // Fetch the current tree
++      const trees = await LocalDb.getTrees();
++      const currentTree = trees.find(t => t.id === id);
++      if (!currentTree) {
++        return res.status(404).json({ error: 'ไม่พบข้อมูลต้นกล้าสักที่ระบุ' });
++      }
++
++      const updates: Partial<Tree> = {};
++      if (ownerName !== undefined) updates.ownerName = ownerName;
++      if (ownerPhone !== undefined) updates.ownerPhone = ownerPhone;
++      if (status !== undefined) updates.status = status;
++      if (height !== undefined) updates.height = Number(height);
++      if (carbonOffset !== undefined) updates.carbonOffset = Number(carbonOffset);
++
++      // Handle Care History Update
++      let updatedCareHistory = currentTree.careHistory ? [...currentTree.careHistory] : [];
++      const newStatus = status !== undefined ? status : currentTree.status;
++      const newHeight = height !== undefined ? Number(height) : currentTree.height;
++      const newImage = imageUrl !== undefined ? imageUrl : '';
++      const newNote = note !== undefined ? note : '';
++
++      if (appendNewLog) {
++        // Append a new care log entry
++        updatedCareHistory.push({
++          date: new Date().toISOString().split('T')[0],
++          status: newStatus,
++          height: newHeight,
++          image: newImage || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=300&q=80',
++          note: newNote || 'อัปเดตสถานะและรูปถ่ายล่าสุดจากการติดตามผล'
++        });
++      } else {
++        // Edit the latest care log entry
++        if (updatedCareHistory.length > 0) {
++          const lastIdx = updatedCareHistory.length - 1;
++          updatedCareHistory[lastIdx] = {
++            ...updatedCareHistory[lastIdx],
++            status: newStatus,
++            height: newHeight,
++            image: newImage || updatedCareHistory[lastIdx].image,
++            note: newNote || updatedCareHistory[lastIdx].note
++          };
++        } else {
++          // Fallback if careHistory is empty
++          updatedCareHistory.push({
++            date: new Date().toISOString().split('T')[0],
++            status: newStatus,
++            height: newHeight,
++            image: newImage || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=300&q=80',
++            note: newNote || 'ลงทะเบียนความสูงและรูปถ่ายจากการติดตาม'
++          });
++        }
++      }
++
++      updates.careHistory = updatedCareHistory;
++
++      const updatedTree = await LocalDb.updateTree(id, updates);
++      if (!updatedTree) {
++        return res.status(404).json({ error: 'ไม่พบข้อมูลต้นกล้าสักที่ระบุ' });
++      }
++
++      res.json(updatedTree);
++    } catch (e) {
++      console.error('Error updating tree:', e);
++      res.status(500).json({ error: 'Failed to update tree details' });
++    }
++  });
++
+   // ==========================================
+   // Vite Server Setup for Client Assets
+   // ==========================================

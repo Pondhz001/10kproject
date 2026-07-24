@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut, signInAnonymously } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -188,5 +188,16 @@ ${treeIndexes.map(idx => `#${idx}`).join(', ')}
   } catch (error) {
     console.error('Error uploading certificate to Google Drive:', error);
     throw error;
+  }
+};
+
+
+export const anonymousSignIn = async (): Promise<any> => {
+  try {
+    const result = await signInAnonymously(auth);
+    return result.user;
+  } catch (error) {
+    console.error('Anonymous sign in error:', error);
+    return null;
   }
 };

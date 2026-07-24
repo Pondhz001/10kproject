@@ -337,7 +337,9 @@ async function startServer() {
     }
   });
 
-  // Verify slip via Gemini + Slip2Go simulation
+  // ==========================================
+  // Vite Server Setup for Client Assets
+  // ==========================================
   const verifySlipHandler = async (req: express.Request, res: express.Response) => {
     try {
       const { orderId, slipImage } = req.body;
@@ -591,7 +593,7 @@ async function startServer() {
 
         return res.json({
           success: true,
-          message: `ตรวจสอบสลิปผ่าน slip2go สำเร็จ! โอนเงินจำนวน ${parsedDetails.amount}฿ ถูกต้อง สั่งปลูกกล้าไม้สักจำนวน ${order.treeCount} ต้นเข้าระบบเรียบร้อยแล้ว`,
+          message: `ตรวจสอบสลิปผ่านระบบสำเร็จ! โอนเงินจำนวน ${parsedDetails.amount}฿ ถูกต้อง สั่งปลูกกล้าไม้สักจำนวน ${order.treeCount} ต้นเข้าระบบเรียบร้อยแล้ว`,
           order: updatedOrder,
           newTrees: newlyPlantedTrees
         });

@@ -1,5 +1,49 @@
 {
   "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information from authentication",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Unique identifier for the user"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Profile photo URL"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Authentication provider"
+        },
+        "lineUserId": {
+          "type": "string",
+          "description": "LINE user ID if logged in via LINE"
+        },
+        "pictureUrl": {
+          "type": "string",
+          "description": "Alternative picture URL"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["uid", "displayName", "provider"]
+    },
     "Tree": {
       "title": "Tree",
       "description": "Information about a planted tree and its care history",
@@ -17,9 +61,17 @@
           "type": "string",
           "description": "Name of the person who donated/bought the tree"
         },
+        "ownerOrganization": {
+          "type": "string",
+          "description": "Organization of the owner"
+        },
         "ownerPhone": {
           "type": "string",
           "description": "Phone number of the owner/donor"
+        },
+        "userId": {
+          "type": "string",
+          "description": "User ID associated with this tree"
         },
         "plantedAt": {
           "type": "string",
@@ -57,17 +109,33 @@
           "type": "string",
           "description": "Name of the donor"
         },
+        "donorOrganization": {
+          "type": "string",
+          "description": "Organization of the donor"
+        },
         "donorPhone": {
           "type": "string",
           "description": "Phone number of the donor"
+        },
+        "userId": {
+          "type": "string",
+          "description": "User ID associated with this order"
         },
         "treeCount": {
           "type": "number",
           "description": "Number of trees ordered"
         },
+        "amount": {
+          "type": "number",
+          "description": "Order total amount"
+        },
         "selectedTreeIndexes": {
           "type": "array",
           "description": "Specific indices selected on the grid"
+        },
+        "treeNames": {
+          "type": "array",
+          "description": "Custom names for the trees"
         },
         "status": {
           "type": "string",
@@ -82,10 +150,16 @@
           "description": "ISO timestamp of order creation"
         }
       },
-      "required": ["id", "donorName", "donorPhone", "treeCount", "selectedTreeIndexes", "status", "slipVerified", "createdAt"]
+      "required": ["id", "donorName", "donorPhone", "treeCount", "amount", "selectedTreeIndexes", "status", "slipVerified", "createdAt"]
     }
   },
   "firestore": {
+    "users": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Collection of user profiles"
+    },
     "trees": {
       "schema": {
         "$ref": "#/entities/Tree"

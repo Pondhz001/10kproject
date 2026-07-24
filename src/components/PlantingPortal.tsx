@@ -276,6 +276,24 @@ export default function PlantingPortal({
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    let currentUser = user;
+    if (!currentUser) {
+      try {
+        const { anonymousSignIn } = await import('../lib/firebase');
+        const anonUser = await anonymousSignIn();
+        if (anonUser) {
+          currentUser = anonUser;
+          setUser(anonUser);
+        } else {
+          setVerifyError('ไม่สามารถเริ่มการเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง');
+          return;
+        }
+      } catch (err) {
+        setVerifyError('เกิดข้อผิดพลาดในการเชื่อมต่อระบบนิรนาม กรุณาเข้าสู่ระบบด้วย Google');
+        return;
+      }
+    }
+
     let hasError = false;
     if (!donorName.trim()) {
       setDonorNameError(true);
@@ -320,7 +338,7 @@ export default function PlantingPortal({
           treeCount,
           selectedTreeIndexes: assignedIndexes,
           treeNames: finalTreeNames,
-          userId: user?.uid || ''
+          userId: currentUser?.uid || ''
         })
       });
 
@@ -450,7 +468,6 @@ export default function PlantingPortal({
           setVerifyStep('อัปโหลดใบรับรองลง Google Drive เรียบร้อยแล้ว! 🌲✨');
         } catch (driveErr) {
           console.error('Drive upload failed:', driveErr);
-          // Don't fail the transaction, just show in log and proceed
         }
       }
 
