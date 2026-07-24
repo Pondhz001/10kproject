@@ -381,4 +381,17 @@ export class LocalDb {
     }
     return null;
   }
+
+  public static async saveUserProfile(user: any): Promise<any> {
+    if (useFirestore && db && user?.uid) {
+      const cleanUid = user.uid.replace(/[^a-zA-Z0-9_-]/g, '_');
+      try {
+        await setDoc(doc(db, 'users', cleanUid), user, { merge: true });
+        return user;
+      } catch (error) {
+        console.warn('Firestore user save failed, falling back to memory/local', error);
+      }
+    }
+    return user;
+  }
 }

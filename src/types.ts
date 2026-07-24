@@ -10,11 +10,25 @@ export interface CareUpdate {
   note: string;
 }
 
+export interface UserProfile {
+  uid: string;
+  displayName: string;
+  email?: string;
+  photoURL?: string;
+  phone?: string;
+  provider: 'google' | 'line' | 'guest';
+  lineUserId?: string;
+  pictureUrl?: string;
+  createdAt?: string;
+}
+
 export interface Tree {
   id: string;
   index: number;
   ownerName: string;
+  ownerOrganization?: string;
   ownerPhone: string;
+  userId?: string;
   plantedAt: string;
   status: 'Seedling' | 'Growing' | 'Young Tree' | 'Mature';
   height: number; // in cm
@@ -34,7 +48,9 @@ export interface Tree {
 export interface Order {
   id: string;
   donorName: string;
+  donorOrganization?: string;
   donorPhone: string;
+  userId?: string;
   treeCount: number;
   amount: number; // treeCount * 100
   status: 'Pending' | 'Paid' | 'Failed';

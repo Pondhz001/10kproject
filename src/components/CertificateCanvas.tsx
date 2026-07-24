@@ -75,19 +75,26 @@ export default function CertificateCanvas({ donorName, treeCount, selectedTreeIn
     drawCornerDecoration(width - 40, height - 40, Math.PI);
     drawCornerDecoration(40, height - 40, -Math.PI / 2);
 
-    // 3. Write Texts
+    // 3. Write Texts & Draw Logo
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
+    // Draw Brand Logo Image
+    const img = new Image();
+    img.src = '/logo.svg';
+    img.onload = () => {
+      ctx.drawImage(img, width / 2 - 40, 50, 80, 72);
+    };
+
     // Header Title
     ctx.fillStyle = darkGreenColor;
-    ctx.font = "bold 46px 'Thonburi', 'Sarabun', 'Georgia', 'Arial', sans-serif";
-    ctx.fillText('ใบประกาศเกียรติคุณ', width / 2, 120);
+    ctx.font = "bold 44px 'Thonburi', 'Sarabun', 'Georgia', 'Arial', sans-serif";
+    ctx.fillText('ใบประกาศเกียรติคุณ', width / 2, 145);
 
     // Campaign text
     ctx.fillStyle = goldColor;
     ctx.font = "bold 24px 'Thonburi', 'Sarabun', 'Georgia', 'Arial', sans-serif";
-    ctx.fillText('โครงการหมื่นกล้าป่าเขียว (10K Forest Initiative)', width / 2, 185);
+    ctx.fillText('โครงการหมื่นกล้าป่าเขียว (10K Forest Initiative)', width / 2, 195);
 
     // Gold decorative line
     ctx.strokeStyle = goldColor;

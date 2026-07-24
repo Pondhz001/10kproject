@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 450" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8ce62c"/>
+      <stop offset="50%" stop-color="#4ea126"/>
+      <stop offset="100%" stop-color="#1e5c12"/>
+    </linearGradient>
+    
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7bd631"/>
+      <stop offset="45%" stop-color="#44991d"/>
+      <stop offset="100%" stop-color="#1b4e0e"/>
+    </linearGradient>
+
+    <linearGradient id="bannerGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#44991d"/>
+      <stop offset="100%" stop-color="#18480d"/>
+    </linearGradient>
+
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#051f04" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#dropShadow)">
+    <!-- Sprouting Leaves at top center -->
+    <g transform="translate(0, 5)">
+      <!-- Left Leaf -->
+      <path d="M 235 185 C 185 140 100 35 220 25 C 275 85 255 150 235 185 Z" 
+            fill="url(#leafGrad)" stroke="#16420c" stroke-width="7" stroke-linejoin="round"/>
+      <path d="M 225 175 C 185 125 165 70 205 45" 
+            fill="none" stroke="#123809" stroke-width="4" stroke-linecap="round"/>
+
+      <!-- Right Leaf -->
+      <path d="M 265 185 C 300 125 320 35 430 35 C 440 125 340 160 265 185 Z" 
+            fill="url(#leafGrad)" stroke="#16420c" stroke-width="7" stroke-linejoin="round"/>
+      <path d="M 275 175 C 310 125 350 70 410 48" 
+            fill="none" stroke="#123809" stroke-width="4" stroke-linecap="round"/>
+
+      <!-- Stem joining into 10K -->
+      <path d="M 235 185 C 245 165 250 165 265 185 L 258 230 L 240 230 Z" 
+            fill="url(#textGrad)" stroke="#16420c" stroke-width="4"/>
+    </g>
+
+    <!-- Main "10K" text in 3D green block style -->
+    <g fill="url(#textGrad)" stroke="#12380a" stroke-width="10" stroke-linejoin="round">
+      <!-- 1 -->
+      <path d="M 80 340 L 80 180 L 125 180 L 125 340 Z M 55 205 L 80 180 L 125 180"/>
+      <!-- 0 (stylized oval) -->
+      <path d="M 240 260 C 240 190 160 180 160 260 C 160 330 240 330 240 260 Z M 200 260 C 200 220 200 220 200 260 C 200 300 200 300 200 260 Z" />
+      <!-- K -->
+      <path d="M 330 340 L 330 180 L 370 180 L 370 250 L 420 180 L 465 180 L 405 260 L 470 340 L 420 340 L 370 270 L 370 340 Z" />
+    </g>
+
+    <!-- Inner Highlight Lines on 10K -->
+    <g fill="none" stroke="#a2f54a" stroke-width="4" opacity="0.7">
+      <path d="M 84 336 L 84 184 L 121 184"/>
+      <path d="M 196 200 C 230 205 234 230 234 260 C 234 290 225 320 200 324"/>
+      <path d="M 334 336 L 334 184 L 366 184 M 423 184 L 406 258 L 463 336"/>
+    </g>
+
+    <!-- Bottom Curved Banner Arch -->
+    <path d="M 35 365 Q 250 415 465 365 L 445 428 Q 250 460 55 428 Z" 
+          fill="url(#bannerGrad)" stroke="#0e2e07" stroke-width="7" stroke-linejoin="round"/>
+
+    <!-- Thai Banner Text: หมื่นกล้าป่าเขียว -->
+    <text x="250" y="416" 
+          font-family="system-ui, -apple-system, 'Prompt', 'Kanit', 'Sarabun', sans-serif" 
+          font-size="36" 
+          font-weight="900" 
+          text-anchor="middle" 
+          fill="#ffffff" 
+          stroke="#0b2405" 
+          stroke-width="4" 
+          paint-order="stroke fill"
+          letter-spacing="2">
+      หมื่นกล้าป่าเขียว
+    </text>
+  </g>
+</svg>

@@ -77,7 +77,8 @@ export default function AboutCampaign() {
     <div className="space-y-12 max-w-6xl mx-auto py-4" id="about-campaign-container">
       
       {/* 1. Header Banner */}
-      <div className="text-center space-y-4 max-w-3xl mx-auto">
+      <div className="text-center space-y-4 max-w-3xl mx-auto flex flex-col items-center">
+        <img src="/logo.svg" alt="10K หมื่นกล้าป่าเขียว" className="w-24 h-24 object-contain filter drop-shadow-md hover:scale-105 transition-transform" />
         <span className="px-3.5 py-1 bg-emerald-500/10 text-emerald-800 text-xs font-black rounded-full uppercase tracking-widest font-mono border border-emerald-500/20">
           หลักการร่วมฟื้นฟู & สัญญาสมบูรณ์
         </span>
@@ -86,7 +87,7 @@ export default function AboutCampaign() {
           <span className="text-emerald-600 font-bold text-2xl md:text-3xl font-sans">(10K Forest Initiative)</span>
         </h2>
         <p className="text-sm md:text-base text-stone-600 leading-relaxed max-w-2xl mx-auto">
-          ร่วมคืนลมหายใจให้แผ่นดิน ฟื้นฟูพื้นที่สีเขียว ณ สำนักวิปัสสนาทางสายเอก หลวงปู่มั่น ดอยนางเมาะ จังหวัดเชียงใหม่ เพื่อเป้าหมาย 10,000 ต้นกล้าสักทองคุณภาพสูง
+          ร่วมคืนลมหายใจให้แผ่นดิน ฟื้นฟูพื้นที่สีเขียว ณ สำนักวิปัสสนาทางสายเอก หลวงปู่มั่น ดอยนางเมาะ จังหวัดเชียงใหม่ เพื่อเป้าหมาย 10,000 ต้นกล้าไม้สักคุณภาพสูง
         </p>
       </div>
 
@@ -100,7 +101,7 @@ export default function AboutCampaign() {
         <div className="text-center space-y-2">
           <h3 className="text-lg md:text-xl font-bold text-stone-900 flex items-center justify-center gap-2">
             <Activity className="w-5 h-5 text-emerald-600 animate-pulse" />
-            พลังงานนิเวศของผืนป่า 10,000 ต้นสักทอง
+            พลังงานนิเวศของผืนป่า 10,000 ต้นไม้สัก
           </h3>
           <p className="text-xs text-stone-500 max-w-xl mx-auto">
             ผลลัพธ์การดูดซับทางสิ่งแวดล้อมและสมดุลชีวภาพเมื่อกล้าไม้ในโครงการเติบโตแข็งแกร่งเป็นผืนป่าถาวร
@@ -222,7 +223,7 @@ export default function AboutCampaign() {
                     ประเทศไทยกำลังเผชิญกับการลดลงของพื้นที่ป่าและผลกระทบจากการเปลี่ยนแปลงสภาพภูมิอากาศ ซึ่งส่งผลต่อระบบนิเวศ แหล่งต้นน้ำ และคุณภาพชีวิตของประชาชนอย่างหลีกเลี่ยงไม่ได้
                   </p>
                   <p className="text-sm leading-relaxed">
-                    โครงการ <strong className="text-emerald-800 font-bold">หมื่นกล้าป่าเขียว (10K Forest Initiative)</strong> จัดตั้งขึ้นเพื่อร่วมฟื้นฟูพื้นที่สีเขียว ณ <strong className="text-emerald-700">สำนักวิปัสสนาทางสายเอก หลวงปู่มั่น ดอยนางเมาะ จังหวัดเชียงใหม่</strong> โดยมุ่งปลูกต้นไม้สักทองคุณภาพจำนวน <strong className="text-emerald-700">10,000 ต้น</strong> ผ่านความร่วมมือระหว่างประชาชน ภาคเอกชน และหน่วยงานต่าง ๆ เพื่อสร้างผืนป่าที่เติบโตอย่างยั่งยืน โปร่งใส และสามารถติดตามผลได้จริงผ่านเทคโนโลยีแผนที่จำลองสะท้อนพิกัด
+                    โครงการ <strong className="text-emerald-800 font-bold">หมื่นกล้าป่าเขียว (10K Forest Initiative)</strong> จัดตั้งขึ้นเพื่อร่วมฟื้นฟูพื้นที่สีเขียว ณ <strong className="text-emerald-700">สำนักวิปัสสนาทางสายเอก หลวงปู่มั่น ดอยนางเมาะ จังหวัดเชียงใหม่</strong> โดยมุ่งปลูกต้นไม้สักคุณภาพจำนวน <strong className="text-emerald-700">10,000 ต้น</strong> ผ่านความร่วมมือระหว่างประชาชน ภาคเอกชน และหน่วยงานต่าง ๆ เพื่อสร้างผืนป่าที่เติบโตอย่างยั่งยืน โปร่งใส และสามารถติดตามผลได้จริงผ่านเทคโนโลยีแผนที่จำลองสะท้อนพิกัด
                   </p>
                   
                   <div className="pt-2">
@@ -414,7 +415,7 @@ export default function AboutCampaign() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
                     <div className="bg-white p-4 border border-stone-200 rounded-xl text-center space-y-1">
                       <span className="text-emerald-600 font-bold text-lg block">10,000 ต้น</span>
-                      <span className="text-stone-400 text-[10px] block">กล้าสักทองลงดินในปี 2026</span>
+                      <span className="text-stone-400 text-[10px] block">กล้าไม้สักลงดินในปี 2026</span>
                     </div>
 
                     <div className="bg-white p-4 border border-stone-200 rounded-xl text-center space-y-1">
@@ -450,7 +451,7 @@ export default function AboutCampaign() {
             </span>
             <h3 className="text-xl font-black text-emerald-950 font-display">สำนักงานและสิทธิ์การคุ้มครอง</h3>
             <p className="text-xs text-stone-500 leading-relaxed">
-              สมาคมผู้พิทักษ์รักษ์ป่าแคมเปญหมื่นกล้าป่าเขียว พร้อมบริการข้อมูลและดูแลประสานงานร่วมอุปถัมภ์กล้าไม้สักทอง
+              สมาคมผู้พิทักษ์รักษ์ป่าแคมเปญหมื่นกล้าป่าเขียว พร้อมบริการข้อมูลและดูแลประสานงานร่วมอุปถัมภ์กล้าไม้สัก
             </p>
           </div>
 

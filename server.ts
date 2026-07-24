@@ -4,8 +4,34 @@ import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { GoogleGenAI, Type } from '@google/genai';
+import QRCode from 'qrcode';
 import { LocalDb } from './src/db';
 import { CareUpdate, Tree } from './src/types';
+
+// PromptPay EMVCo Payload Generator
+function crc16(str: string): string {
+  let crc = 0xFFFF;
+  for (let c = 0; c < str.length; c++) {
+    const charCode = str.charCodeAt(c);
+    let x = ((crc >> 8) ^ charCode) & 0xFF;
+    x ^= x >> 4;
+    crc = ((crc << 8) ^ (x << 12) ^ (x << 5) ^ x) & 0xFFFF;
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function generatePromptPayPayload(amount: number, phoneNumber: string = '0817960622'): string {
+  const targetPP = phoneNumber.startsWith('0') 
+    ? `0066${phoneNumber.substring(1)}` 
+    : phoneNumber;
+  
+  const accountInfo = `0016A0000006770101110113${targetPP}`;
+  const merchantField = `29${accountInfo.length}${accountInfo}`;
+  const amountStr = Number(amount).toFixed(2);
+  const amountField = `54${String(amountStr.length).padStart(2, '0')}${amountStr}`;
+  let payload = `000201010211${merchantField}5303764${amountField}5802TH6304`;
+  return payload + crc16(payload);
+}
 
 // Load environment variables
 dotenv.config();
@@ -115,80 +141,97 @@ async function startServer() {
     }
   });
 
-  // Create order & plant trees directly (payment closed)
-  app.post('/api/orders', async (req, res) => {
+  // Create order/pledge (Supported via both /api/forest/pledge and /api/orders)
+  const createPledgeHandler = async (req: express.Request, res: express.Response) => {
     try {
-      const { donorName, donorPhone, treeCount, selectedTreeIndexes, treeNames, isMember } = req.body;
+      const { donorName, organization, donorOrganization, donorPhone, treeCount, selectedTreeIndexes, treeNames, userId } = req.body;
       if (!donorName || !donorPhone || !treeCount || treeCount < 1) {
-        return res.status(400).json({ error: 'ข้อมูลสำหรับร่วมปลูกไม่ครบถ้วน' });
+        return res.status(400).json({ error: 'กรุณากรอกข้อมูลชื่อ เบอร์โทรศัพท์ และจำนวนต้นไม้ให้ครบถ้วน' });
       }
 
-      if (isMember) {
-        // Member requires payment (100 Baht per tree)
-        const amount = treeCount * 100;
-        const order = await LocalDb.addOrder({
-          donorName,
-          donorPhone,
-          treeCount,
-          amount,
-          status: 'Pending',
-          slipVerified: false,
-          selectedTreeIndexes,
-          treeNames
-        });
+      const org = organization || donorOrganization || '';
+      const amount = treeCount * 100; // 100 THB per tree
 
-        return res.json({
-          order,
-          newTrees: [] // No trees planted yet because we need to pay first!
-        });
-      }
-
-      const amount = 0; // Free Campaign
       const order = await LocalDb.addOrder({
         donorName,
+        donorOrganization: org,
         donorPhone,
-        treeCount,
+        userId: userId || '',
+        treeCount: Number(treeCount),
         amount,
-        status: 'Paid',
-        slipVerified: true,
-        selectedTreeIndexes,
-        treeNames
+        status: 'Pending',
+        slipVerified: false,
+        selectedTreeIndexes: selectedTreeIndexes || [],
+        treeNames: treeNames || []
       });
-
-      // Automatically register/plant the seedlings
-      const newlyPlantedTrees = [];
-      const chosenIndexes = selectedTreeIndexes || [];
-      for (let i = 0; i < treeCount; i++) {
-        const indexToPlant = chosenIndexes[i];
-        const ownerNameForTree = (treeNames && treeNames[i] && treeNames[i].trim()) ? treeNames[i].trim() : donorName;
-        const tree = await LocalDb.addTree({
-          ownerName: ownerNameForTree,
-          ownerPhone: donorPhone,
-          plantedAt: new Date().toISOString(),
-          status: 'Seedling',
-          height: 15, // starting seedling height (cm)
-          index: indexToPlant,
-          carbonOffset: 1.5,
-          careHistory: [
-            {
-              date: new Date().toISOString().split('T')[0],
-              status: 'Seedling',
-              height: 15,
-              image: 'https://images.unsplash.com/photo-1588714024415-7485307b2203?auto=format&fit=crop&w=300&q=80',
-              note: `ร่วมลงทะเบียนกล้าสักทองสลักชื่อ คุณ ${ownerNameForTree} เรียบร้อยแล้ว ได้รับความคุ้มครองและดูแลโดยทีมงานหมื่นกล้าป่าเขียว`
-            }
-          ]
-        });
-        newlyPlantedTrees.push(tree);
-      }
 
       res.json({
+        success: true,
         order,
-        newTrees: newlyPlantedTrees
+        message: 'สร้างรายการร่วมปลูกเรียบร้อยแล้ว กรุณาชำระเงินผ่าน QR Code'
       });
     } catch (e) {
-      console.error('Error creating order/planting trees:', e);
-      res.status(500).json({ error: 'Failed to create registration' });
+      console.error('Error creating pledge order:', e);
+      res.status(500).json({ error: 'ไม่สามารถสร้างรายการร่วมปลูกได้' });
+    }
+  };
+
+  app.post('/api/forest/pledge', createPledgeHandler);
+  app.post('/api/orders', createPledgeHandler);
+
+  // Generate PromptPay QR Code
+  app.post('/api/payment/generate-qr', async (req, res) => {
+    try {
+      const { amount, orderId, phoneNumber } = req.body;
+      const targetAmount = Number(amount) || 100;
+      const targetPhone = phoneNumber || '0817960622';
+
+      const payload = generatePromptPayPayload(targetAmount, targetPhone);
+      const qrImageUrl = await QRCode.toDataURL(payload, { margin: 2, width: 320 });
+
+      res.json({
+        success: true,
+        amount: targetAmount,
+        orderId: orderId || null,
+        payload,
+        qrImageUrl
+      });
+    } catch (e) {
+      console.error('Error generating QR Code:', e);
+      res.status(500).json({ error: 'ไม่สามารถสร้าง QR Code สำหรับชำระเงินได้' });
+    }
+  });
+
+  // Sync user profile
+  app.post('/api/user/sync', async (req, res) => {
+    try {
+      const userProfile = req.body;
+      if (!userProfile || !userProfile.uid) {
+        return res.status(400).json({ error: 'ไม่พบข้อมูลผู้ใช้' });
+      }
+      const saved = await LocalDb.saveUserProfile(userProfile);
+      res.json({ success: true, user: saved });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to sync user profile' });
+    }
+  });
+
+  // Get user trees by userId or phone or ownerName
+  app.get('/api/user/trees', async (req, res) => {
+    try {
+      const { userId, phone, name } = req.query;
+      const trees = await LocalDb.getTrees();
+
+      const userTrees = trees.filter(t => {
+        if (userId && t.userId === String(userId)) return true;
+        if (phone && t.ownerPhone && t.ownerPhone.replace(/\D/g, '') === String(phone).replace(/\D/g, '')) return true;
+        if (name && t.ownerName && t.ownerName.trim().toLowerCase().includes(String(name).trim().toLowerCase())) return true;
+        return false;
+      });
+
+      res.json({ success: true, count: userTrees.length, trees: userTrees });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to fetch user trees' });
     }
   });
 
@@ -295,7 +338,7 @@ async function startServer() {
   });
 
   // Verify slip via Gemini + Slip2Go simulation
-  app.post('/api/verify-slip', async (req, res) => {
+  const verifySlipHandler = async (req: express.Request, res: express.Response) => {
     try {
       const { orderId, slipImage } = req.body;
       if (!orderId || !slipImage) {
@@ -524,7 +567,9 @@ async function startServer() {
           const ownerNameForTree = (order.treeNames && order.treeNames[i] && order.treeNames[i].trim()) ? order.treeNames[i].trim() : order.donorName;
           const tree = await LocalDb.addTree({
             ownerName: ownerNameForTree,
+            ownerOrganization: order.donorOrganization || '',
             ownerPhone: order.donorPhone,
+            userId: order.userId || '',
             plantedAt: new Date().toISOString(),
             status: 'Seedling',
             height: 15, // standard starting seedling height (cm)
@@ -537,7 +582,7 @@ async function startServer() {
                 status: 'Seedling',
                 height: 15,
                 image: 'https://images.unsplash.com/photo-1588714024415-7485307b2203?auto=format&fit=crop&w=300&q=80',
-                note: `ร่วมลงทะเบียนกล้าสักทองสลักชื่อ คุณ ${ownerNameForTree} เรียบร้อยแล้ว ได้รับความคุ้มครองและดูแลโดยทีมงานหมื่นกล้าป่าเขียว`
+                note: `ร่วมลงทะเบียนกล้าไม้สักสลักชื่อ คุณ ${ownerNameForTree}${order.donorOrganization ? ` (${order.donorOrganization})` : ''} เรียบร้อยแล้ว ได้รับความคุ้มครองและดูแลโดยทีมงานหมื่นกล้าป่าเขียว`
               }
             ]
           });
@@ -546,7 +591,7 @@ async function startServer() {
 
         return res.json({
           success: true,
-          message: `ตรวจสอบสลิปผ่าน slip2go สำเร็จ! โอนเงินจำนวน ${parsedDetails.amount}฿ ถูกต้อง สั่งปลูกกล้าสักทองจำนวน ${order.treeCount} ต้นเข้าระบบเรียบร้อยแล้ว`,
+          message: `ตรวจสอบสลิปผ่าน slip2go สำเร็จ! โอนเงินจำนวน ${parsedDetails.amount}฿ ถูกต้อง สั่งปลูกกล้าไม้สักจำนวน ${order.treeCount} ต้นเข้าระบบเรียบร้อยแล้ว`,
           order: updatedOrder,
           newTrees: newlyPlantedTrees
         });
@@ -560,7 +605,10 @@ async function startServer() {
       console.error('Error in /api/verify-slip:', e);
       res.status(500).json({ error: 'เกิดข้อผิดพลาดในการตรวจสอบสลิปการโอนเงิน' });
     }
-  });
+  };
+
+  app.post('/api/verify-slip', verifySlipHandler);
+  app.post('/api/payment/verify-slip', verifySlipHandler);
 
   // ==========================================
   // Vite Server Setup for Client Assets

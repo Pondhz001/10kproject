@@ -6,12 +6,14 @@ import CertificateCanvas from './components/CertificateCanvas';
 import PoetryNarrator from './components/PoetryNarrator';
 import AboutCampaign from './components/AboutCampaign';
 import HomeCampaign from './components/HomeCampaign';
-import { Trees, Search, Shovel, Trees as EcoIcon, Sparkles, Scale, Users, CheckCircle, Heart, Info, Lock, Printer, ShieldCheck, X, Mail, Phone as PhoneIcon, MessageSquare, Info as InfoIcon, FileText, Globe, Heart as HeartIcon, Home } from 'lucide-react';
+import BrandLogo from './components/BrandLogo';
+import UserDashboard from './components/UserDashboard';
+import { Trees, Search, Shovel, Trees as EcoIcon, Sparkles, Scale, Users, CheckCircle, Heart, Info, Lock, Printer, ShieldCheck, X, Mail, Phone as PhoneIcon, MessageSquare, Info as InfoIcon, FileText, Globe, Heart as HeartIcon, Home, UserCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'plant' | 'about'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'plant' | 'about' | 'my-trees'>('home');
   const [plantMode, setPlantMode] = useState<'member' | 'admin'>('member');
 
   // Admin Access State
@@ -166,66 +168,50 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           
           {/* Logo Brand (Clickable to Home) */}
-          <div 
-            onClick={() => setActiveTab('home')}
-            className="flex items-center gap-3 group cursor-pointer hover:opacity-90 transition-all"
-          >
-            <div className="p-2.5 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl shadow-lg shadow-emerald-950/10 group-hover:scale-105 transition-transform">
-              <Trees className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-lg font-black tracking-tight text-emerald-950 flex items-center gap-1.5 font-sans">
-                หมื่นกล้าป่าเขียว
-                <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200/50 px-2 py-0.5 rounded-full font-mono font-bold">100฿</span>
-              </h1>
-              <p className="text-[10px] text-emerald-800/70 font-mono tracking-wider font-semibold">
-                MUEN KLA PA KHIAO FOREST CAMPAIGN
-              </p>
-            </div>
-          </div>
+          <BrandLogo onClick={() => setActiveTab('home')} size="md" />
 
           {/* Elegant tab controls */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
             {isAdmin && (
-              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/40 px-3 py-2 rounded-xl text-xs text-amber-900 font-medium">
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/60 px-3 py-1.5 rounded-xl text-xs text-amber-900 font-medium shrink-0 shadow-xs">
                 <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                <span>แอดมินโครงการ</span>
+                <span>แอดมิน</span>
                 <button
                   onClick={() => {
                     setIsAdmin(false);
                     localStorage.removeItem('is_admin');
                     setActiveTab('map');
                   }}
-                  className="text-[10px] text-stone-500 hover:text-red-600 hover:no-underline transition ml-1.5 underline cursor-pointer font-bold font-mono"
+                  className="text-[10px] text-stone-400 hover:text-red-600 transition ml-1 cursor-pointer font-bold font-mono"
                 >
-                  [LOGOUT]
+                  [ออก]
                 </button>
               </div>
             )}
 
-            <nav className="flex gap-1.5 bg-white p-1.5 rounded-2xl border border-emerald-900/10 shadow-sm">
+            <nav className="flex gap-1 bg-stone-100/80 p-1.5 rounded-2xl border border-stone-200/80 shadow-xs shrink-0 max-w-full overflow-x-auto no-scrollbar">
               <button
                 onClick={() => setActiveTab('home')}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
                   activeTab === 'home'
-                    ? 'bg-emerald-600 text-white shadow-sm border border-emerald-500/10'
-                    : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
+                    ? 'bg-emerald-700 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
                 }`}
               >
-                <Home className="w-4 h-4 text-emerald-300" />
+                <Home className={`w-4 h-4 ${activeTab === 'home' ? 'text-amber-300' : 'text-emerald-600'}`} />
                 หน้าแรก
               </button>
 
               <button
                 onClick={() => setActiveTab('map')}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
                   activeTab === 'map'
-                    ? 'bg-emerald-600 text-white shadow-sm border border-emerald-500/10'
-                    : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
+                    ? 'bg-emerald-700 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
                 }`}
               >
-                <Trees className="w-4 h-4 text-emerald-300" />
-                กล้าสักในโครงการ
+                <Trees className={`w-4 h-4 ${activeTab === 'map' ? 'text-amber-300' : 'text-emerald-600'}`} />
+                กล้าไม้สักในโครงการ
               </button>
 
               <button
@@ -233,14 +219,14 @@ export default function App() {
                   setPlantMode('member');
                   setActiveTab('plant');
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
                   activeTab === 'plant' && plantMode === 'member'
-                    ? 'bg-emerald-600 text-white shadow-sm border border-emerald-500/10'
-                    : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
+                    ? 'bg-emerald-700 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
                 }`}
               >
-                <Sparkles className="w-4 h-4 text-amber-300" />
-                ร่วมปลูก (สมาชิก) 👑
+                <Sparkles className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' ? 'text-amber-300' : 'text-amber-500'}`} />
+                ร่วมปลูก (สมาชิก)
               </button>
 
               <button
@@ -250,25 +236,37 @@ export default function App() {
                     setActiveTab('plant');
                   });
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
                   activeTab === 'plant' && plantMode === 'admin'
-                    ? 'bg-amber-500 text-stone-900 shadow-sm border border-amber-400/10'
-                    : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
+                    ? 'bg-amber-500 text-stone-950 shadow-sm font-black border border-amber-400'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-white/80'
                 }`}
               >
-                <EcoIcon className="w-4 h-4 text-amber-950" />
-                บันทึกปลูก (แอดมิน) 🛠
+                <EcoIcon className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'admin' ? 'text-stone-950' : 'text-amber-700'}`} />
+                บันทึกปลูก (แอดมิน)
+              </button>
+
+              <button
+                onClick={() => setActiveTab('my-trees')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'my-trees'
+                    ? 'bg-emerald-700 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
+                }`}
+              >
+                <UserCheck className={`w-4 h-4 ${activeTab === 'my-trees' ? 'text-amber-300' : 'text-emerald-600'}`} />
+                ต้นไม้ของฉัน
               </button>
 
               <button
                 onClick={() => setActiveTab('about')}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
                   activeTab === 'about'
-                    ? 'bg-emerald-800 text-white shadow-sm border border-emerald-700/10'
-                    : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
+                    ? 'bg-emerald-800 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
                 }`}
               >
-                <Info className="w-4 h-4 text-emerald-400" />
+                <Info className={`w-4 h-4 ${activeTab === 'about' ? 'text-amber-300' : 'text-emerald-600'}`} />
                 เกี่ยวกับโครงการ / MOU
               </button>
             </nav>
@@ -636,6 +634,17 @@ export default function App() {
               />
             )}
 
+            {activeTab === 'my-trees' && (
+              <UserDashboard
+                trees={trees}
+                onViewCertificate={handleViewCertificate}
+                onGoToPlanting={() => {
+                  setPlantMode('member');
+                  setActiveTab('plant');
+                }}
+              />
+            )}
+
             {activeTab === 'about' && (
               <AboutCampaign />
             )}
@@ -646,9 +655,9 @@ export default function App() {
       {/* Elegant Footer Credit */}
       <footer className="border-t border-emerald-900/10 bg-white text-stone-500 text-[10px] font-mono py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <EcoIcon className="w-3.5 h-3.5 text-emerald-600" />
-            <span>โครงการหมื่นกล้าป่าเขียว © 2026</span>
+          <div className="flex items-center gap-2.5">
+            <img src="/logo.svg" alt="Logo" className="w-6 h-6 object-contain" />
+            <span className="font-bold text-stone-700">โครงการหมื่นกล้าป่าเขียว (10K Forest) © 2026</span>
           </div>
 
           <div className="flex items-center gap-4 text-stone-500">

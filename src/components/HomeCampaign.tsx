@@ -39,10 +39,11 @@ export default function HomeCampaign({ stats, onEnterCampaign }: HomeCampaignPro
           <motion.div 
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-800/50 backdrop-blur-md text-emerald-300 text-xs font-bold rounded-full border border-emerald-700/30 uppercase tracking-widest font-mono"
+            className="inline-flex items-center gap-3 px-4 py-2 bg-emerald-900/80 backdrop-blur-md text-emerald-300 text-xs font-bold rounded-full border border-emerald-700/50 uppercase tracking-widest font-mono shadow-md"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            แคมเปญฟื้นฟูป่าเพื่อโลกสีเขียวอย่างยั่งยืน
+            <img src="/logo.svg" alt="10K Logo" className="w-6 h-6 object-contain" />
+            <span>โครงการ 10K หมื่นกล้าป่าเขียว</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
           </motion.div>
 
           <motion.h1 
@@ -63,7 +64,7 @@ export default function HomeCampaign({ stats, onEnterCampaign }: HomeCampaignPro
             transition={{ delay: 0.2 }}
             className="text-sm md:text-base text-emerald-100/80 leading-relaxed font-sans max-w-2xl"
           >
-            ร่วมอุปถัมภ์กล้าไม้สักทองคุณภาพสูงเพียง <strong className="text-amber-300 font-bold">100฿</strong> ต่อต้น พร้อมสลักป้ายชื่อของคุณปักพิกัด GPS จริง ณ พื้นที่ป่าแคมเปญ วัดดอยนางเมาะ จังหวัดเชียงใหม่ เพื่อเป้าหมายฟื้นฟูระบบนิเวศรวม 10,000 ต้นกล้าสักทองให้แข็งแกร่งเป็นผืนป่าถาวร
+            ร่วมอุปถัมภ์กล้าไม้สักคุณภาพสูงเพียง <strong className="text-amber-300 font-bold">100฿</strong> ต่อต้น พร้อมสลักป้ายชื่อของคุณปักพิกัด GPS จริง ณ พื้นที่ป่าแคมเปญ วัดดอยนางเมาะ จังหวัดเชียงใหม่ เพื่อเป้าหมายฟื้นฟูระบบนิเวศรวม 10,000 ต้นกล้าไม้สักให้แข็งแกร่งเป็นผืนป่าถาวร
           </motion.p>
 
           <motion.div 
@@ -86,7 +87,7 @@ export default function HomeCampaign({ stats, onEnterCampaign }: HomeCampaignPro
               className="px-8 py-4 bg-white/10 hover:bg-white/15 text-white font-bold text-sm rounded-2xl backdrop-blur-md border border-white/10 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Shovel className="w-4 h-4 text-amber-300" />
-              ร่วมปลูกกล้าไม้สักทอง 100฿
+              ร่วมปลูกกล้าไม้สัก 100฿
             </button>
           </motion.div>
         </div>
@@ -141,7 +142,7 @@ export default function HomeCampaign({ stats, onEnterCampaign }: HomeCampaignPro
                 {stats.totalTarget.toLocaleString()}
               </p>
               <div className="flex justify-between items-center mt-1 text-[10px] text-stone-500">
-                <span>ต้นกล้าสักทองทั้งหมด</span>
+                <span>ต้นกล้าไม้สักทั้งหมด</span>
                 <span className="text-emerald-700 font-semibold font-mono">10,000 ต้น</span>
               </div>
             </div>
@@ -207,7 +208,7 @@ export default function HomeCampaign({ stats, onEnterCampaign }: HomeCampaignPro
       <div className="space-y-8 bg-white border border-emerald-900/10 rounded-[2.5rem] p-8 md:p-12 shadow-sm">
         <div className="text-center space-y-2 max-w-2xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-black text-emerald-950 font-sans">
-            จุดเด่นระบบอุปถัมภ์กล้าไม้สักทอง
+            จุดเด่นระบบอุปถัมภ์กล้าไม้สัก
           </h2>
           <p className="text-xs md:text-sm text-stone-600 leading-relaxed">
             เชื่อมโยงเทคโนโลยีดิจิทัลเข้ากับการฟื้นฟูธรรมชาติจริง เพื่อความโปร่งใสและประโยชน์สูงสุดแก่ระบบนิเวศ
@@ -222,7 +223,7 @@ export default function HomeCampaign({ stats, onEnterCampaign }: HomeCampaignPro
             </div>
             <h3 className="text-base font-black text-stone-900">ระบุพิกัดแผนที่ 3D จริง</h3>
             <p className="text-xs text-stone-600 leading-relaxed">
-              ต้นสักทองทุกต้นในแคมเปญจะได้รับหมายเลขกล้าไม้ เช่น <strong className="font-mono">#MK-123</strong> และมีพิกัดที่ดินระบุจริงบนแผนที่จำลองของวัดดอยนางเมาะ คุณสามารถคลิกดูต้นไม้ของคุณได้ทุกเมื่อ
+              ต้นไม้สักทุกต้นในแคมเปญจะได้รับหมายเลขกล้าไม้ เช่น <strong className="font-mono">#MK-123</strong> และมีพิกัดที่ดินระบุจริงบนแผนที่จำลองของวัดดอยนางเมาะ คุณสามารถคลิกดูต้นไม้ของคุณได้ทุกเมื่อ
             </p>
           </div>
 
@@ -309,7 +310,7 @@ export default function HomeCampaign({ stats, onEnterCampaign }: HomeCampaignPro
             className="px-10 py-4 bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-sm rounded-xl transition shadow-lg hover:scale-[1.02] cursor-pointer inline-flex items-center gap-2"
           >
             <Shovel className="w-4 h-4 text-amber-950" />
-            ร่วมปลูกกล้าไม้สักทอง 100฿ ตอนนี้เลย!
+            ร่วมปลูกกล้าไม้สัก 100฿ ตอนนี้เลย!
           </button>
         </div>
       </div>
