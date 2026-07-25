@@ -30,7 +30,7 @@ export interface Tree {
   ownerPhone: string;
   userId?: string;
   plantedAt: string;
-  status: 'Seedling' | 'Growing' | 'Young Tree' | 'Mature';
+  status: 'Pending Verification' | 'Seedling' | 'Growing' | 'Young Tree' | 'Mature';
   height: number; // in cm
   carbonOffset: number; // kg of CO2 absorbed
   careHistory: CareUpdate[];
@@ -54,6 +54,7 @@ export interface Order {
   treeCount: number;
   amount: number; // treeCount * 100
   status: 'Pending' | 'Paid' | 'Failed';
+  verificationCode?: string;
   slipVerified: boolean;
   selectedTreeIndexes?: number[];
   treeNames?: string[];

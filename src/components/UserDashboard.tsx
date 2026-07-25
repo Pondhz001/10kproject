@@ -253,7 +253,7 @@ export default function UserDashboard({ trees = [], onViewCertificate, onGoToPla
                 </button>
               </div>
 
-              <div className="overflow-x-auto flex justify-center py-2">
+              <div className="overflow-x-auto smooth-scroll flex justify-center py-2">
                 <CertificateCanvas
                   donorName={selectedCertTree.ownerName}
                   treeCount={1}

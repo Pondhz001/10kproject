@@ -249,6 +249,7 @@ export default function ForestMap({ trees, onSelectTree, selectedTree, onJoinPla
   }, [startRange, searchQuery, ownerSearchQuery, filterStatus, treesMap, trees]);
 
   const getStatusColor = (status: string) => {
+    if (status === 'Pending Verification') return 'bg-amber-100/80 text-amber-800 border-amber-300';
     switch (status) {
       case 'Seedling': return 'bg-lime-50 text-lime-700 border-lime-200/50';
       case 'Growing': return 'bg-emerald-50 text-emerald-700 border-emerald-200/50';
@@ -389,7 +390,7 @@ export default function ForestMap({ trees, onSelectTree, selectedTree, onJoinPla
             {displayedSeedlings.map(({ index, tree, isPlanted }) => {
               const active = isIndexSelected(index);
               
-              return (
+                            return (
                 <motion.button
                   key={index}
                   onClick={() => handleSelectSeedlingIndex(index, tree)}
@@ -399,7 +400,9 @@ export default function ForestMap({ trees, onSelectTree, selectedTree, onJoinPla
                     active
                       ? 'bg-amber-500 border-amber-400 text-stone-900 shadow-md shadow-amber-500/10 z-20 font-bold'
                       : isPlanted
-                        ? 'bg-emerald-50 border-emerald-100 text-emerald-800 hover:border-emerald-400 hover:bg-emerald-50'
+                        ? (tree?.status === 'Pending Verification' 
+                            ? 'bg-amber-100 border-amber-300 text-amber-800 hover:border-amber-400 hover:bg-amber-50' 
+                            : 'bg-emerald-50 border-emerald-100 text-emerald-800 hover:border-emerald-400 hover:bg-emerald-50')
                         : 'bg-white border-stone-200 text-stone-400 hover:border-amber-400 hover:bg-stone-50'
                   }`}
                 >
@@ -408,11 +411,13 @@ export default function ForestMap({ trees, onSelectTree, selectedTree, onJoinPla
                   </span>
                   
                   <div className="flex items-center justify-between mt-1">
-                    <span className={`text-[9px] font-medium truncate max-w-[65px] ${active ? 'text-stone-950' : 'text-stone-600'}`} title={isPlanted ? (tree?.ownerName || 'ร่วมปลูกแล้ว') : 'ว่าง'}>
-                      {isPlanted ? (tree?.ownerName || 'ร่วมปลูกแล้ว') : 'ว่าง'}
+                    <span className={`text-[9px] font-medium truncate max-w-[65px] ${active ? 'text-stone-950' : 'text-stone-600'}`} title={isPlanted ? (tree?.status === 'Pending Verification' ? 'รอยืนยัน' : 'เสร็จสิ้น') : 'ว่าง'}>
+                      {isPlanted ? (tree?.status === 'Pending Verification' ? 'รอยืนยัน' : 'เสร็จสิ้น') : 'ว่าง'}
                     </span>
                     {isPlanted ? (
-                      <TreePine className={`w-3.5 h-3.5 ${active ? 'text-stone-950' : 'text-emerald-600'}`} />
+                      tree?.status === 'Pending Verification' 
+                        ? <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-stone-950' : 'bg-amber-500 animate-pulse'}`} /> 
+                        : <TreePine className={`w-3.5 h-3.5 ${active ? 'text-stone-950' : 'text-emerald-600'}`} />
                     ) : (
                       <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-stone-950' : 'bg-stone-300'}`} />
                     )}
@@ -486,7 +491,8 @@ export default function ForestMap({ trees, onSelectTree, selectedTree, onJoinPla
                   
                   {/* Badge */}
                   <span className={`absolute top-3 right-3 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${getStatusColor(selectedTree.status)}`}>
-                    {selectedTree.status === 'Seedling' ? '🌱 ต้นกล้า' : 
+                    {selectedTree.status === 'Pending Verification' ? '⏳ รอยืนยัน' : 
+                     selectedTree.status === 'Seedling' ? '🌱 ต้นกล้า' : 
                      selectedTree.status === 'Growing' ? '🌿 กำลังโต' : 
                      selectedTree.status === 'Young Tree' ? '🌳 สักรุ่นเยาว์' : '🌲 สักเต็มวัย'}
                   </span>
@@ -781,7 +787,8 @@ export default function ForestMap({ trees, onSelectTree, selectedTree, onJoinPla
                     </h3>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(isEditing ? editStatus : selectedTree.status)} shadow-sm`}>
-                    {(isEditing ? editStatus : selectedTree.status) === 'Seedling' ? '🌱 ต้นกล้า' : 
+                    {(isEditing ? editStatus : selectedTree.status) === 'Pending Verification' ? '⏳ รอยืนยัน' : 
+                     (isEditing ? editStatus : selectedTree.status) === 'Seedling' ? '🌱 ต้นกล้า' : 
                      (isEditing ? editStatus : selectedTree.status) === 'Growing' ? '🌿 กำลังโต' : 
                      (isEditing ? editStatus : selectedTree.status) === 'Young Tree' ? '🌳 สักรุ่นเยาว์' : '🌲 สักเต็มวัย'}
                   </span>

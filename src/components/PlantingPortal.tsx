@@ -2,9 +2,11 @@ import React, { useState, useRef } from 'react';
 import { Tree, Order } from '../types';
 import { ShoppingBag, QrCode, UploadCloud, FileImage, ShieldCheck, HelpCircle, CheckCircle, Trees, Loader2, Sparkles, Download, LogIn, LogOut, ExternalLink, HardDrive, Building2, UserCheck, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import VerifyPlanting from './VerifyPlanting';
 
 interface PlantingPortalProps {
   onOrderCompleted: (order: Order, newTrees: Tree[]) => void;
+  onOrderCreated?: () => void;
   preSelectedTreeIndex?: number | null;
   setPreSelectedTreeIndex?: (index: number | null) => void;
   preSelectedTreeIndexes?: number[];
@@ -12,6 +14,8 @@ interface PlantingPortalProps {
   trees: Tree[];
   initialMemberMode?: boolean;
   isAdmin?: boolean;
+  onNavigateToMyTrees?: () => void;
+  initialSubTab?: 'new' | 'verify';
 }
 
 // CRC16 CCITT Standard for Thai PromptPay QR Code
@@ -54,10 +58,14 @@ export default function PlantingPortal({
   setPreSelectedTreeIndexes,
   trees,
   initialMemberMode = false,
-  isAdmin = false
+  isAdmin = false,
+  onNavigateToMyTrees,
+  onOrderCreated,
+  initialSubTab = 'new'
 }: PlantingPortalProps) {
   // Google Drive & Member Authentication State
   const [isMemberMode, setIsMemberMode] = useState(!isAdmin ? true : initialMemberMode);
+  const [subTab, setSubTab] = useState<'new' | 'verify'>(initialSubTab);
 
   React.useEffect(() => {
     if (!isAdmin) {
@@ -74,7 +82,15 @@ export default function PlantingPortal({
   const [treeCount, setTreeCount] = useState(1);
   const [useSeparateNames, setUseSeparateNames] = useState(false);
   const [separateNames, setSeparateNames] = useState<string[]>([]);
+  
+  React.useEffect(() => {
+    setSubTab(initialSubTab);
+  }, [initialSubTab]);
+
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyCodeError, setVerifyCodeError] = useState<string | null>(null);
   const [donorNameError, setDonorNameError] = useState(false);
   const [donorPhoneError, setDonorPhoneError] = useState(false);
 
@@ -99,6 +115,7 @@ export default function PlantingPortal({
   const [selectedStartIndex, setSelectedStartIndex] = useState<number>(100001);
   const [manualIndexInput, setManualIndexInput] = useState('');
   const [manualInputError, setManualInputError] = useState<string | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   // Pre-calculate taken indexes
   const takenIndexes = React.useMemo(() => new Set(trees.map(t => t.index)), [trees]);
@@ -187,14 +204,8 @@ export default function PlantingPortal({
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   
   // File Slip Upload State
-  const [dragActive, setDragActive] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isVerifyingSlip, setIsVerifyingSlip] = useState(false);
   const [verifyStep, setVerifyStep] = useState('');
-  const [verifyError, setVerifyError] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -243,7 +254,8 @@ export default function PlantingPortal({
           treeCount,
           selectedTreeIndexes: assignedIndexes,
           treeNames: finalTreeNames,
-          userId: ''
+          userId: '',
+          isAdmin
         })
       });
 
@@ -253,7 +265,12 @@ export default function PlantingPortal({
 
       const responseData = await response.json();
       if (responseData.order) {
-        setActiveOrder(responseData.order);
+        if (responseData.order.status === 'Paid') {
+          onOrderCompleted(responseData.order, responseData.trees || []);
+        } else {
+          setActiveOrder(responseData.order);
+          if (onOrderCreated) onOrderCreated();
+        }
       } else {
         throw new Error('ไม่สามารถสร้างรายการร่วมปลูกได้');
       }
@@ -265,115 +282,12 @@ export default function PlantingPortal({
   };
 
   // Convert file to Base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
-  };
 
-  const processFile = (file: File) => {
-    if (file && file.type.startsWith('image/')) {
-      setUploadedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-      setVerifyError(null);
-    } else {
-      setVerifyError('กรุณาอัปโหลดเฉพาะไฟล์รูปภาพ (JPG, PNG) เท่านั้น');
-    }
-  };
 
   // Drag handlers
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0]);
-    }
-  };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      processFile(e.target.files[0]);
-    }
-  };
 
-  // Slip Verify handler (communicating with our full-stack slip2go + Gemini backend)
-  const handleVerifySlip = async () => {
-    if (!activeOrder || !uploadedFile) return;
-
-    setIsVerifyingSlip(true);
-    setVerifyError(null);
-    
-    // Simulate real steps for visually stunning UI progress
-    const steps = [
-      'เชื่อมต่อระบบตรวจสอบสลิป slip2go...',
-      'กำลังอ่านข้อมูลและวิเคราะห์ QR Code สลิป...',
-      'ตรวจสอบยอดเงินโอนและธนาคารคู่ค้าคู่สัญญา...',
-      'จับคู่รหัสร่วมปลูกและลงทะเบียนกล้าไม้สัก...'
-    ];
-
-    let currentStepIdx = 0;
-    setVerifyStep(steps[0]);
-
-    const stepTimer = setInterval(() => {
-      if (currentStepIdx < steps.length - 1) {
-        currentStepIdx++;
-        setVerifyStep(steps[currentStepIdx]);
-      }
-    }, 1200);
-
-    try {
-      const base64Image = await fileToBase64(uploadedFile);
-      
-      const response = await fetch('/api/verify-slip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: activeOrder.id,
-          slipImage: base64Image
-        })
-      });
-
-      clearInterval(stepTimer);
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'การตรวจสอบสลิปล้มเหลว ยอดเงินไม่ตรงหรือสลิปไม่ถูกต้อง');
-      }
-
-      setVerifyStep('ยืนยันความถูกต้องและสลักข้อมูลปลูกแล้ว!');
-
-      let isUploaded = false;
-
-      setTimeout(() => {
-        onOrderCompleted(result.order, result.newTrees);
-        // Reset states
-        setActiveOrder(null);
-        setUploadedFile(null);
-        setPreviewUrl(null);
-        setIsVerifyingSlip(false);
-      }, isUploaded ? 2000 : 1000);
-
-    } catch (err: any) {
-      clearInterval(stepTimer);
-      setVerifyError(err.message || 'การตรวจสอบสลิปล้มเหลว กรุณาตรวจสอบยอดเงินโอนและอัปโหลดไฟล์รูปสลิปอีกครั้ง');
-      setIsVerifyingSlip(false);
-    }
-  };
 
   // Generate PromptPay String for amount
   // Use static payment QR provided by user
@@ -388,11 +302,73 @@ export default function PlantingPortal({
     document.body.removeChild(link);
   };
 
+
+  const handleVerifyCode = async () => {
+    if (!verificationCode.trim()) {
+      setVerifyCodeError('กรุณากรอกรหัสยืนยัน');
+      return;
+    }
+    
+    setIsVerifying(true);
+    setVerifyCodeError(null);
+    
+    try {
+      const response = await fetch('/api/orders/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: activeOrder?.id,
+          verificationCode
+        })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'ไม่สามารถยืนยันการปลูกได้');
+      }
+      
+      onOrderCompleted(activeOrder!, []);
+      setActiveOrder(null);
+    } catch (err: any) {
+      setVerifyCodeError(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   return (
     <div className="bg-white border border-emerald-900/10 rounded-3xl p-6 lg:p-8 shadow-sm max-w-4xl mx-auto" id="planting-portal">
       <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-950/5 rounded-full blur-3xl pointer-events-none" />
       
+
+      {isMemberMode && !isAdmin && (
+        <div className="flex space-x-6 border-b border-stone-200 mb-8 px-2 relative z-10">
+          <button
+            onClick={() => setSubTab('new')}
+            className={`px-4 py-2 text-sm font-bold flex items-center gap-2 border-b-2 transition ${
+              subTab === 'new' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-stone-500 hover:text-stone-700'
+            }`}
+          >
+            <Trees className="w-4 h-4" />
+            ร่วมปลูกใหม่
+          </button>
+          <button
+            onClick={() => setSubTab('verify')}
+            className={`px-4 py-2 text-sm font-bold flex items-center gap-2 border-b-2 transition ${
+              subTab === 'verify' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-stone-500 hover:text-stone-700'
+            }`}
+          >
+            <CheckCircle className="w-4 h-4" />
+            ใส่ Order ID ยืนยัน
+          </button>
+        </div>
+      )}
+
+      {subTab === 'verify' ? (
+        <VerifyPlanting onVerified={() => { if(onNavigateToMyTrees) onNavigateToMyTrees(); }} />
+      ) : (
       <AnimatePresence mode="wait">
+
         {!activeOrder ? (
           // STEP 1: Buy / Order Form
           <motion.div
@@ -764,7 +740,7 @@ export default function PlantingPortal({
                         {isMemberMode ? (
                           <>
                             <QrCode className="w-4 h-4" />
-                            <span>ชำระเงินร่วมปลูก ({treeCount * 100}฿)</span>
+                            <span>ยืนยันข้อมูลและรับ QR Code ชำระเงิน ({treeCount * 100}฿)</span>
                           </>
                         ) : (
                           <>
@@ -824,7 +800,7 @@ export default function PlantingPortal({
                 <img
                   src={qrCodeUrl}
                   alt="PromptPay QR Code"
-                  className="w-48 h-48 mx-auto"
+                  className="w-full max-w-[240px] h-auto object-contain mx-auto"
                   referrerPolicy="no-referrer"
                 />
 
@@ -871,101 +847,60 @@ export default function PlantingPortal({
               </button>
             </div>
 
-            {/* Slip Verification Box */}
+            {/* Line OA Slip Verification Box */}
             <div className="md:col-span-7 flex flex-col justify-between space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-stone-200">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                  <MessageCircle className="w-5 h-5 text-[#00B900]" />
                   <h3 className="font-semibold text-stone-800">
-                    อัปโหลดสลิปธนาคารเพื่อตรวจสอบผ่าน slip2go
+                    ยืนยันการโอนเงินผ่าน Line OA
                   </h3>
                 </div>
 
-                <p className="text-xs text-stone-500 leading-normal">
-                  เพื่อความรวดเร็วและแม่นยำ กรุณาอัปโหลดรูปภาพสลิปที่โอนชำระเงินสำเร็จแล้ว ระบบ slip2go ร่วมกับโมเดลวิเคราะห์ AI จะทำการสแกนประวัติการโอนเงิน ตรวจยอดโอน และร่วมปลูกต้นไม้สักให้คุณโดยอัตโนมัติภายใน 5 วินาที!
+                <p className="text-sm text-stone-600 leading-relaxed">
+                  เมื่อท่านโอนเงินเรียบร้อยแล้ว <b>กรุณาส่งสลิปโอนเงินพร้อมแจ้งชื่อและเบอร์โทรศัพท์</b> เพื่อให้ทีมงานตรวจสอบความถูกต้องและรับใบประกาศเกียรติคุณได้ทาง Line Official
                 </p>
 
-                {/* Drag and drop zone */}
-                <div
-                  onDragEnter={handleDrag}
-                  onDragOver={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition ${
-                    dragActive
-                      ? 'border-emerald-500 bg-emerald-50/20'
-                      : 'border-stone-200 bg-stone-50/50 hover:border-emerald-300 hover:bg-emerald-50/10'
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                  />
-
-                  {previewUrl ? (
-                    <div className="space-y-3">
-                      <div className="relative mx-auto max-w-[120px] rounded-lg overflow-hidden border border-stone-200 shadow-sm">
-                        <img src={previewUrl} alt="Receipt Slip Preview" className="w-full h-auto object-contain" />
-                        <div className="absolute inset-0 bg-black/5" />
-                      </div>
-                      <p className="text-xs font-semibold text-emerald-700 font-mono">
-                        {uploadedFile?.name}
-                      </p>
-                      <p className="text-[10px] text-stone-500">คลิกที่นี่หรือลากไฟล์มาวางเพื่อเปลี่ยนรูปสลิป</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="p-3 bg-stone-100 rounded-full inline-block text-stone-500 border border-stone-200 shadow-inner">
-                        <UploadCloud className="w-6 h-6 text-stone-400" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-stone-600">ลากและวางรูปสลิป หรือ คลิกเพื่อเลือกรูป</p>
-                        <p className="text-[10px] text-stone-400 font-mono">รองรับไฟล์ JPG, PNG ขนาดสูงสุด 5MB</p>
-                      </div>
-                    </div>
-                  )}
+                <div className="flex flex-col items-center justify-center p-6 bg-stone-50 border border-stone-200 rounded-2xl space-y-4">
+                  <img src="/line-oa-qr.png" alt="Line OA QR Code" className="w-40 h-auto object-contain rounded-xl shadow-sm" onError={(e) => { e.currentTarget.src = 'https://qr-official.line.me/gs/M_502xoloz_GW.png'; }} />
+                    
+                  <div className="flex flex-col w-full max-w-xs gap-3 mt-2">
+                    <a href="https://lin.ee/Sv5qrGD" target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-[#00B900] hover:bg-[#009900] text-white font-bold text-sm rounded-xl transition shadow-sm flex items-center justify-center gap-2 no-underline">
+                      <MessageCircle className="w-5 h-5" />
+                      เพิ่มเพื่อนและส่งสลิปผ่าน Line
+                    </a>
+                    <a href="https://www.facebook.com/profile.php?id=61591647386304" target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold text-sm rounded-xl transition shadow-sm flex items-center justify-center gap-2 no-underline">
+                      <ExternalLink className="w-5 h-5" />
+                      ติดตามแฟนเพจของเรา
+                    </a>
+                  </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="space-y-4">
-                {isVerifyingSlip ? (
-                  <div className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center space-y-3">
-                    <Loader2 className="w-6 h-6 text-emerald-600 animate-spin" />
-                    <div className="space-y-1 text-center">
-                      <p className="text-xs font-semibold text-emerald-700 font-mono animate-pulse">
-                        {verifyStep}
-                      </p>
-                      <p className="text-[10px] text-stone-500">ระบบ slip2go กำลังรับรองความปลอดภัยทางการเงิน</p>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleVerifySlip}
-                    disabled={!uploadedFile}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-stone-100 disabled:text-stone-450 text-white font-bold text-sm rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <ShieldCheck className="w-4.5 h-4.5" />
-                    ตรวจสอบสลิปและร่วมปลูกทันที
-                  </button>
-                )}
 
-                {verifyError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium">
-                    {verifyError}
-                  </div>
-                )}
+                
+              <div className="space-y-4 pt-4 border-t border-stone-200">
+                 <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl text-center">
+                   <h4 className="text-sm font-bold text-emerald-800 mb-2">ขั้นตอนต่อไป</h4>
+                   <p className="text-xs text-emerald-700 mb-4">
+                     หลังจากส่งสลิปผ่าน Line OA แอดมินจะตรวจสอบและยืนยันในระบบให้คุณ <br/>
+                     คุณสามารถนำ Order ID ไปตรวจสอบในเมนู <b>"แจ้งโอนเงิน/ยืนยันการซื้อ"</b> เพื่อเสร็จสิ้นกระบวนการ หรือรอแอดมินดำเนินการให้
+                   </p>
+                 </div>
+                   
+                 <div className="text-center mt-4">
+                   <button onClick={() => { setActiveOrder(null); }} className="px-6 py-2.5 bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold text-sm rounded-xl transition cursor-pointer">
+                     ปิดหน้าต่างนี้ (รอรับการตรวจสอบจาก Line OA)
+                   </button>
+                 </div>
               </div>
+
+
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-
+      )}
     </div>
   );
 }

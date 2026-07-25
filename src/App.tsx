@@ -5,16 +5,19 @@ import PlantingPortal from './components/PlantingPortal';
 import CertificateCanvas from './components/CertificateCanvas';
 import PoetryNarrator from './components/PoetryNarrator';
 import AboutCampaign from './components/AboutCampaign';
+import AdminDashboard from './components/AdminDashboard';
+import VerifyPlanting from './components/VerifyPlanting';
 import HomeCampaign from './components/HomeCampaign';
 import BrandLogo from './components/BrandLogo';
 import UserDashboard from './components/UserDashboard';
-import { Trees, Search, Shovel, Trees as EcoIcon, Sparkles, Scale, Users, CheckCircle, Heart, Info, Lock, Printer, ShieldCheck, X, Mail, Phone as PhoneIcon, MessageSquare, Info as InfoIcon, FileText, Globe, Heart as HeartIcon, Home, UserCheck } from 'lucide-react';
+import { MessageCircle, Trees, Search, Shovel, Trees as EcoIcon, Sparkles, Scale, Users, CheckCircle, Heart, Info, Lock, Printer, ShieldCheck, X, Mail, Phone as PhoneIcon, MessageSquare, Info as InfoIcon, FileText, Globe, Heart as HeartIcon, Home, UserCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'plant' | 'about' | 'my-trees'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'plant' | 'about' | 'my-trees' | 'admin-dashboard' | 'verify'>('home');
   const [plantMode, setPlantMode] = useState<'member' | 'admin'>('member');
+  const [plantSubTab, setPlantSubTab] = useState<'new' | 'verify'>('new');
 
   // Admin Access State
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
@@ -44,6 +47,40 @@ export default function App() {
   // Pre-selected seedling number for planting
   const [preSelectedTreeIndex, setPreSelectedTreeIndex] = useState<number | null>(null);
   const [preSelectedTreeIndexes, setPreSelectedTreeIndexes] = useState<number[]>([]);
+
+  
+  // Admin Auto-Logout Timer (5 minutes)
+  const ADMIN_TIMEOUT_MS = 5 * 60 * 1000;
+  
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      if (isAdmin) {
+        timeoutId = setTimeout(() => {
+          setIsAdmin(false);
+          localStorage.removeItem('is_admin');
+          if (activeTab === 'admin-dashboard' || (activeTab === 'plant' && plantMode === 'admin')) {
+            setActiveTab('map');
+          }
+          alert('ออกจากระบบแอดมินอัตโนมัติเนื่องจากไม่มีการใช้งานเกิน 5 นาที');
+        }, ADMIN_TIMEOUT_MS);
+      }
+    };
+
+    if (isAdmin) {
+      resetTimer(); // Start timer initially when admin logs in
+      
+      const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+      events.forEach(event => window.addEventListener(event, resetTimer));
+
+      return () => {
+        clearTimeout(timeoutId);
+        events.forEach(event => window.removeEventListener(event, resetTimer));
+      };
+    }
+  }, [isAdmin, activeTab, plantMode]);
 
   // Load stats and tree list from our full-stack Express endpoints
   const fetchStatsAndTrees = async (currentSelectedId?: string) => {
@@ -118,18 +155,7 @@ export default function App() {
 
   // View certificate of a specific tree
   const handleViewCertificate = (tree: Tree) => {
-    setSuccessOrder({
-      id: tree.id,
-      donorName: tree.ownerName,
-      donorPhone: tree.ownerPhone,
-      treeCount: 1,
-      amount: 100,
-      status: 'Paid',
-      slipVerified: true,
-      selectedTreeIndexes: [tree.index],
-      createdAt: tree.plantedAt,
-    });
-    setIsViewingCertificate(true);
+    window.open('https://lin.ee/Sv5qrGD', '_blank');
   };
 
   // Check admin authorization before running action
@@ -162,37 +188,22 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f3f7f3] text-stone-800 flex flex-col font-sans selection:bg-emerald-200 selection:text-emerald-900">
+    <div className="min-h-screen-safe bg-[#f3f7f3] text-stone-800 flex flex-col font-sans selection:bg-emerald-200 selection:text-emerald-900">
       {/* Top Header Navigation */}
-      <header className="border-b border-emerald-900/10 bg-white/85 backdrop-blur-md sticky top-0 z-40">
+      <header className="border-b border-emerald-900/10 bg-white/85 backdrop-blur-md sticky top-0 z-40 pt-safe">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           
           {/* Logo Brand (Clickable to Home) */}
           <BrandLogo onClick={() => setActiveTab('home')} size="md" />
 
           {/* Elegant tab controls */}
-          <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-            {isAdmin && (
-              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/60 px-3 py-1.5 rounded-xl text-xs text-amber-900 font-medium shrink-0 shadow-xs">
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                <span>แอดมิน</span>
-                <button
-                  onClick={() => {
-                    setIsAdmin(false);
-                    localStorage.removeItem('is_admin');
-                    setActiveTab('map');
-                  }}
-                  className="text-[10px] text-stone-400 hover:text-red-600 transition ml-1 cursor-pointer font-bold font-mono"
-                >
-                  [ออก]
-                </button>
-              </div>
-            )}
+          <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto smooth-scroll pb-1 sm:pb-0 no-scrollbar">
+            
 
-            <nav className="flex gap-1 bg-stone-100/80 p-1.5 rounded-2xl border border-stone-200/80 shadow-xs shrink-0 max-w-full overflow-x-auto no-scrollbar">
+            <nav className="flex gap-1 bg-stone-100/80 p-1.5 rounded-2xl border border-stone-200/80 shadow-xs shrink-0 max-w-full overflow-x-auto smooth-scroll no-scrollbar">
               <button
                 onClick={() => setActiveTab('home')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
                   activeTab === 'home'
                     ? 'bg-emerald-700 text-white shadow-sm font-black'
                     : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
@@ -203,8 +214,20 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => setActiveTab('about')}
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'about'
+                    ? 'bg-emerald-800 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
+                }`}
+              >
+                <Info className={`w-4 h-4 ${activeTab === 'about' ? 'text-amber-300' : 'text-emerald-600'}`} />
+                เกี่ยวกับโครงการ
+              </button>
+
+              <button
                 onClick={() => setActiveTab('map')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
                   activeTab === 'map'
                     ? 'bg-emerald-700 text-white shadow-sm font-black'
                     : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
@@ -214,19 +237,89 @@ export default function App() {
                 กล้าไม้สักในโครงการ
               </button>
 
+              
               <button
                 onClick={() => {
                   setPlantMode('member');
+                  setPlantSubTab('new');
                   setActiveTab('plant');
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === 'plant' && plantMode === 'member'
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'new'
                     ? 'bg-emerald-700 text-white shadow-sm font-black'
                     : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
                 }`}
               >
-                <Sparkles className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' ? 'text-amber-300' : 'text-amber-500'}`} />
+                <Sparkles className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'new' ? 'text-amber-300' : 'text-amber-500'}`} />
                 ร่วมปลูก (สมาชิก)
+              </button>
+
+              <button
+                onClick={() => {
+                  setPlantMode('member');
+                  setPlantSubTab('verify');
+                  setActiveTab('plant');
+                }}
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'verify'
+                    ? 'bg-emerald-700 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
+                }`}
+              >
+                <CheckCircle className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'verify' ? 'text-amber-300' : 'text-emerald-600'}`} />
+                แจ้งโอนเงิน/ยืนยันการซื้อ
+              </button>
+
+
+              <button
+                onClick={() => setActiveTab('my-trees')}
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'my-trees'
+                    ? 'bg-emerald-700 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
+                }`}
+              >
+                <UserCheck className={`w-4 h-4 ${activeTab === 'my-trees' ? 'text-amber-300' : 'text-emerald-600'}`} />
+                ต้นไม้ของฉัน
+              </button>
+            </nav>
+
+            <div className="flex items-center gap-1 bg-amber-50 p-2 rounded-2xl border border-amber-200/60 shadow-xs shrink-0 max-w-full overflow-x-auto smooth-scroll no-scrollbar sm:ml-2">
+              <div className={`flex items-center gap-1.5 px-2 mr-1 text-xs font-bold border-r border-amber-200/50 pr-3 ${isAdmin ? 'text-amber-900' : 'text-stone-500'}`}>
+                <ShieldCheck className={`w-4 h-4 ${isAdmin ? 'text-amber-600' : 'text-stone-400'}`} />
+                แอดมิน
+                {isAdmin ? (
+                  <button
+                    onClick={() => {
+                      setIsAdmin(false);
+                      localStorage.removeItem('is_admin');
+                      setActiveTab('map');
+                    }}
+                    className="text-[9px] text-stone-400 hover:text-red-600 transition ml-1 cursor-pointer font-black font-mono bg-white px-2 py-1.5 min-h-[36px] rounded-lg border border-stone-200"
+                  >
+                    ออก
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      checkAdminAndExecute(() => {});
+                    }}
+                    className="text-[9px] text-emerald-600 hover:text-emerald-700 transition ml-1 cursor-pointer font-black font-mono bg-white px-2 py-1.5 min-h-[36px] rounded-lg border border-stone-200"
+                  >
+                    เข้าสู่ระบบ
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => checkAdminAndExecute(() => setActiveTab('admin-dashboard'))}
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'admin-dashboard'
+                    ? 'bg-purple-700 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-purple-900 hover:bg-amber-100/50'
+                }`}
+              >
+                <Lock className={`w-4 h-4 ${activeTab === 'admin-dashboard' ? 'text-amber-300' : 'text-purple-600'}`} />
+                ระบบจัดการข้อมูล
               </button>
 
               <button
@@ -236,40 +329,16 @@ export default function App() {
                     setActiveTab('plant');
                   });
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
                   activeTab === 'plant' && plantMode === 'admin'
                     ? 'bg-amber-500 text-stone-950 shadow-sm font-black border border-amber-400'
-                    : 'text-stone-600 hover:text-stone-900 hover:bg-white/80'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-100/50'
                 }`}
               >
                 <EcoIcon className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'admin' ? 'text-stone-950' : 'text-amber-700'}`} />
-                บันทึกปลูก (แอดมิน)
+                บันทึกปลูกแทน
               </button>
-
-              <button
-                onClick={() => setActiveTab('my-trees')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === 'my-trees'
-                    ? 'bg-emerald-700 text-white shadow-sm font-black'
-                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
-                }`}
-              >
-                <UserCheck className={`w-4 h-4 ${activeTab === 'my-trees' ? 'text-amber-300' : 'text-emerald-600'}`} />
-                ต้นไม้ของฉัน
-              </button>
-
-              <button
-                onClick={() => setActiveTab('about')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === 'about'
-                    ? 'bg-emerald-800 text-white shadow-sm font-black'
-                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
-                }`}
-              >
-                <Info className={`w-4 h-4 ${activeTab === 'about' ? 'text-amber-300' : 'text-emerald-600'}`} />
-                เกี่ยวกับโครงการ / MOU
-              </button>
-            </nav>
+            </div>
           </div>
         </div>
       </header>
@@ -376,122 +445,35 @@ export default function App() {
                 <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
                 <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-                {!isViewingCertificate ? (
-                  // VIEW 1: Success Confirmation Message
-                  <div className="text-center space-y-6">
-                    <div className="w-16 h-16 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20 animate-bounce">
-                      <CheckCircle className="w-10 h-10" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <h3 className="text-2xl font-black text-white tracking-tight">ร่วมลงทะเบียนปลูกกล้าไม้สักสำเร็จ!</h3>
-                      <p className="text-xs text-stone-400 leading-relaxed">
-                        ข้อมูลผู้ร่วมปลูกและป้ายแทรกสลักชื่อของคุณได้รับการบันทึกเข้าระบบนิเวศป่าเรียบร้อยแล้ว!
-                      </p>
-                    </div>
-
-                    {/* Receipt breakdown */}
-                    <div className="bg-stone-950 border border-stone-800/80 rounded-2xl p-5 text-left space-y-3 font-sans">
-                      <div className="flex justify-between items-center pb-2.5 border-b border-stone-800/40">
-                        <span className="text-xs text-stone-500 font-medium">ชื่อผู้ร่วมปลูก (ป้ายแทรก)</span>
-                        <span className="text-sm font-semibold text-stone-200">{successOrder.donorName}</span>
-                      </div>
-                      <div className="flex justify-between items-center pb-2.5 border-b border-stone-800/40">
-                        <span className="text-xs text-stone-500 font-medium">ข้อมูลติดต่อ</span>
-                        <span className="text-sm font-mono font-semibold text-stone-200">{successOrder.donorPhone}</span>
-                      </div>
-                      <div className="flex justify-between items-center pb-2.5 border-b border-stone-800/40">
-                        <span className="text-xs text-stone-500 font-medium">จำนวนกล้าไม้สัก</span>
-                        <span className="text-sm font-semibold text-emerald-400">{successOrder.treeCount} ต้น</span>
-                      </div>
-                      <div className="flex justify-between items-center pb-2.5 border-b border-stone-800/40">
-                        <span className="text-xs text-stone-500 font-medium">หมายเลขประจำกล้าไม้สัก</span>
-                        <span className="text-sm font-mono font-bold text-emerald-500 text-right max-w-[300px] break-words">
-                          {successOrder.selectedTreeIndexes?.map(idx => `#MK-${idx}`).join(', ') || 'สุ่มกล้าสัก'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center pt-1">
-                        <span className="text-xs text-stone-500 font-medium">ค่าลงทะเบียนและป้ายแทรก</span>
-                        <span className="text-sm font-black text-emerald-400 font-mono">ฟรี (ไม่มีค่าใช้จ่าย)</span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                      <button
-                        onClick={() => setIsViewingCertificate(true)}
-                        className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-sm rounded-xl transition shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                        รับรูปใบประกาศเกียรติคุณ
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setActiveTab('map');
-                          setSuccessOrder(null);
-                        }}
-                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-stone-950 font-bold text-sm rounded-xl transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Trees className="w-4 h-4" />
-                        ดูกล้าสักในโครงการ
-                      </button>
-                    </div>
-
+                <div className="text-center space-y-6">
+                  <div className="w-16 h-16 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20 animate-bounce">
+                    <CheckCircle className="w-10 h-10" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-black text-white tracking-tight">ทำรายการสำเร็จ!</h3>
+                    <p className="text-xs text-stone-400 leading-relaxed">
+                      ข้อมูลของคุณได้รับการบันทึกเรียบร้อยแล้ว
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-3 pt-2">
                     <button
-                      onClick={() => setSuccessOrder(null)}
-                      className="text-xs text-stone-500 hover:text-stone-300 underline font-medium block mx-auto transition pt-2"
+                      onClick={() => window.open('https://lin.ee/Sv5qrGD', '_blank')}
+                      className="w-full py-3 bg-[#00B900] hover:bg-[#009900] text-white font-black text-sm rounded-xl transition shadow-lg flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      ปิดหน้าต่างกลับสู่โครงการ
+                      <MessageCircle className="w-4 h-4" />
+                      ติดต่อรับใบประกาศเกียรติคุณผ่าน Line
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('map');
+                        setSuccessOrder(null);
+                      }}
+                      className="w-full py-3 bg-stone-800 hover:bg-stone-700 text-white font-bold text-sm rounded-xl transition shadow-lg cursor-pointer"
+                    >
+                      กลับไปดูแผนที่
                     </button>
                   </div>
-                ) : (
-                  // VIEW 2: Certificate of Tree Planting (Fully Rendered HTML5 Canvas with PNG Downloader!)
-                  <div className="space-y-6 text-left">
-                    <div className="flex justify-between items-center pb-3 border-b border-stone-800">
-                      <h4 className="text-sm font-bold text-stone-300 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-amber-500" />
-                        เกียรติบัตรเกียรติยศผู้ร่วมคืนป่าเขียว
-                      </h4>
-                      <button
-                        onClick={() => setIsViewingCertificate(false)}
-                        className="text-xs text-stone-500 hover:text-stone-400 underline transition cursor-pointer"
-                      >
-                        ย้อนกลับ
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-xs text-stone-400">
-                        เกียรติบัตรฉบับนี้จัดทำขึ้นเพื่อประกาศเกียรติคุณและเชิดชูเกียรติแก่ผู้ร่วมสร้างการเปลี่ยนแปลงอุปถัมภ์กล้าไม้และสนับสนุนทุนฟื้นฟูระบบนิเวศวิทยาทางชีวภาพของแผ่นดินป่าเมืองเหนืออย่างซื่อสัตย์และงดงามในแคมเปญหมื่นกล้าป่าเขียว
-                      </p>
-                    </div>
-
-                    {/* Integrated Certificate Canvas */}
-                    <CertificateCanvas
-                      donorName={successOrder.donorName}
-                      treeCount={successOrder.treeCount}
-                      selectedTreeIndexes={successOrder.selectedTreeIndexes || []}
-                    />
-
-                    <div className="flex justify-between items-center pt-2">
-                      <button
-                        onClick={() => {
-                          setActiveTab('map');
-                          setSuccessOrder(null);
-                        }}
-                        className="text-xs text-stone-500 hover:text-stone-300 underline font-medium transition cursor-pointer"
-                      >
-                        ปิดหน้าต่างนี้และกลับไปดูแผนที่
-                      </button>
-                      <button
-                        onClick={() => setIsViewingCertificate(false)}
-                        className="text-xs text-emerald-400 hover:text-emerald-300 font-bold transition cursor-pointer"
-                      >
-                        ย้อนดูรายละเอียดใบเสร็จ
-                      </button>
-                    </div>
-                  </div>
-                )}
+                </div>
               </motion.div>
             </div>
           )}
@@ -624,6 +606,7 @@ export default function App() {
             {activeTab === 'plant' && (
               <PlantingPortal
                 onOrderCompleted={handleOrderCompleted}
+                onOrderCreated={() => fetchStatsAndTrees()}
                 preSelectedTreeIndex={preSelectedTreeIndex}
                 setPreSelectedTreeIndex={setPreSelectedTreeIndex}
                 preSelectedTreeIndexes={preSelectedTreeIndexes}
@@ -631,8 +614,11 @@ export default function App() {
                 trees={trees}
                 initialMemberMode={plantMode === 'member'}
                 isAdmin={isAdmin}
+                initialSubTab={plantSubTab}
+                onNavigateToMyTrees={() => setActiveTab('my-trees')}
               />
             )}
+
 
             {activeTab === 'my-trees' && (
               <UserDashboard
@@ -644,10 +630,18 @@ export default function App() {
                 }}
               />
             )}
+            
+            {activeTab === 'admin-dashboard' && isAdmin && (
+              <AdminDashboard />
+            )}
+
 
             {activeTab === 'about' && (
               <AboutCampaign />
             )}
+
+            
+
           </motion.div>
         </AnimatePresence>
       </main>

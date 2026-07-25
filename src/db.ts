@@ -18,7 +18,7 @@ const TreeSchema = new mongoose.Schema({
   ownerPhone: String,
   userId: String,
   plantedAt: String,
-  status: { type: String, enum: ['Seedling', 'Growing', 'Young Tree', 'Mature'] },
+  status: { type: String, enum: ['Pending Verification', 'Seedling', 'Growing', 'Young Tree', 'Mature'] },
   height: Number,
   carbonOffset: Number,
   careHistory: [CareUpdateSchema],
@@ -55,6 +55,7 @@ const OrderSchema = new mongoose.Schema({
     sendingBank: String,
   },
   createdAt: String,
+  verificationCode: String,
 });
 
 const UserProfileSchema = new mongoose.Schema({
@@ -67,6 +68,7 @@ const UserProfileSchema = new mongoose.Schema({
   lineUserId: String,
   pictureUrl: String,
   createdAt: String,
+  verificationCode: String,
 });
 
 // Models
@@ -142,7 +144,7 @@ export class LocalDb {
 
   public static async updateTree(id: string, updates: Partial<Tree>): Promise<Tree | null> {
     await connectDB();
-    const tree = await TreeModel.findOneAndUpdate({ id } as any, { $set: updates }, { new: true, upsert: false }).lean();
+    const tree = await TreeModel.findOneAndUpdate({ id } as any, { $set: updates }, { new: true } as any).lean();
     return tree as unknown as Tree | null;
   }
 
@@ -178,14 +180,16 @@ export class LocalDb {
     return order as unknown as Order | null;
   }
 
-  public static async addOrder(order: Omit<Order, 'id' | 'createdAt' | 'status' | 'slipVerified'> & { status?: 'Pending' | 'Paid' | 'Failed'; slipVerified?: boolean }): Promise<Order> {
+  public static async addOrder(order: Omit<Order, 'id' | 'createdAt' | 'status' | 'slipVerified'> & { status?: 'Pending' | 'Paid' | 'Failed'; slipVerified?: boolean; verificationCode?: string }): Promise<Order> {
     await connectDB();
-    const id = `ord-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase() + Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const id = `MK-${randomStr}`;
     const newOrder = new OrderModel({
       ...order,
       id,
       status: order.status || 'Pending',
       slipVerified: order.slipVerified ?? false,
+      verificationCode: order.verificationCode || '',
       createdAt: new Date().toISOString()
     });
     await newOrder.save();
@@ -194,7 +198,7 @@ export class LocalDb {
 
   public static async updateOrder(id: string, updates: Partial<Order>): Promise<Order | null> {
     await connectDB();
-    const order = await OrderModel.findOneAndUpdate({ id } as any, { $set: updates }, { new: true, upsert: false }).lean();
+    const order = await OrderModel.findOneAndUpdate({ id } as any, { $set: updates }, { new: true } as any).lean();
     return order as unknown as Order | null;
   }
 

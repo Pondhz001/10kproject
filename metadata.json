@@ -1,6 +1,6 @@
 {
-  "name": "Remix: Muen Kla Pa Khiao",
-  "description": "Plant teak for 100฿ with professional care, secure QR payments, and automated slip verification for a greener future.",
+  "name": "หมื่นกล้าป่าเขียว",
+  "description": "โครงการหมื่นกล้าป่าเขียว อุปถัมภ์กล้าไม้สักเพื่อฟื้นฟูระบบนิเวศ",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

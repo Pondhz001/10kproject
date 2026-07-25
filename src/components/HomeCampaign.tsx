@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   Trees, 
@@ -14,19 +14,23 @@ import {
   Leaf,
   Globe,
   Sun,
-  Activity
+  Activity,
+  Key,
+  X
 } from 'lucide-react';
 import { CampaignStats } from '../types';
 
 interface HomeCampaignProps {
   stats: CampaignStats;
-  onEnterCampaign: (tab: 'map' | 'plant' | 'about') => void;
+  onEnterCampaign: (tab: 'map' | 'plant' | 'about' | 'verify') => void;
 }
 
 export default function HomeCampaign({ stats, onEnterCampaign }: HomeCampaignProps) {
   const percentPlanted = ((stats.totalPlanted / stats.totalTarget) * 100).toFixed(1);
-
+        
+  
   return (
+    <>
     <div className="space-y-16 py-4 max-w-6xl mx-auto" id="home-campaign-container">
       
       {/* 1. HERO SECTION */}
@@ -89,6 +93,15 @@ export default function HomeCampaign({ stats, onEnterCampaign }: HomeCampaignPro
               <Shovel className="w-4 h-4 text-amber-300" />
               ร่วมปลูกกล้าไม้สัก 100฿
             </button>
+
+            <button
+              onClick={() => onEnterCampaign('verify')}
+              className="px-8 py-4 bg-transparent border border-white/20 hover:bg-white/10 text-white font-bold text-sm rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 w-full md:w-auto"
+            >
+              <Key className="w-4 h-4 text-emerald-300" />
+              กรอก Order ID ยืนยันการปลูกจาก Line OA
+            </button>
+
           </motion.div>
         </div>
 
@@ -315,5 +328,6 @@ export default function HomeCampaign({ stats, onEnterCampaign }: HomeCampaignPro
         </div>
       </div>
     </div>
+    </>
   );
 }
