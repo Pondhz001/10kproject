@@ -4,8 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { GoogleGenAI, Type } from '@google/genai';
-import QRCode from 'qrcode';
-import { LocalDb } from './src/db';
+import { LocalDb, connectDB } from './src/db';
 import { CareUpdate, Tree } from './src/types';
 
 // PromptPay EMVCo Payload Generator
@@ -48,7 +47,7 @@ const ai = new GoogleGenAI({
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Initialize and ensure uploads directory exists
   const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -182,18 +181,16 @@ async function startServer() {
   // Generate PromptPay QR Code
   app.post('/api/payment/generate-qr', async (req, res) => {
     try {
-      const { amount, orderId, phoneNumber } = req.body;
+      const { amount, orderId } = req.body;
       const targetAmount = Number(amount) || 100;
-      const targetPhone = phoneNumber || '0817960622';
-
-      const payload = generatePromptPayPayload(targetAmount, targetPhone);
-      const qrImageUrl = await QRCode.toDataURL(payload, { margin: 2, width: 320 });
+      
+      const qrImageUrl = '/payment-qr.jpeg';
 
       res.json({
         success: true,
         amount: targetAmount,
         orderId: orderId || null,
-        payload,
+        payload: 'static-qr',
         qrImageUrl
       });
     } catch (e) {
@@ -201,6 +198,7 @@ async function startServer() {
       res.status(500).json({ error: 'ไม่สามารถสร้าง QR Code สำหรับชำระเงินได้' });
     }
   });
+
 
 
 

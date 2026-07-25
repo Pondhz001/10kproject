@@ -11,7 +11,7 @@ interface UserDashboardProps {
 }
 
 export default function UserDashboard({ trees = [], onViewCertificate, onGoToPlanting }: UserDashboardProps) {
-  const [searchPhone, setSearchPhone] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [userTrees, setUserTrees] = useState<Tree[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCertTree, setSelectedCertTree] = useState<Tree | null>(null);
@@ -25,13 +25,21 @@ export default function UserDashboard({ trees = [], onViewCertificate, onGoToPla
     try {
       let filtered: Tree[] = [];
 
-      // If user provided a phone number search or searchPhone matches
-      if (searchPhone.trim()) {
-        const cleanSearchPhone = searchPhone.replace(/\D/g, '');
-        const phoneMatches = trees.filter(t => t.ownerPhone && t.ownerPhone.replace(/\D/g, '').includes(cleanSearchPhone));
+      // If user provided a search query
+      if (searchQuery.trim()) {
+        const query = searchQuery.trim().toLowerCase();
+        const cleanPhoneQuery = query.replace(/\D/g, '');
+        
+        const matches = trees.filter(t => {
+          if (cleanPhoneQuery && t.ownerPhone && t.ownerPhone.replace(/\D/g, '').includes(cleanPhoneQuery)) return true;
+          if (t.ownerName && t.ownerName.toLowerCase().includes(query)) return true;
+          if (t.index && t.index.toString() === cleanPhoneQuery) return true;
+          return false;
+        });
+        
         // Merge without duplicates
         const existingIds = new Set(filtered.map(t => t.id));
-        phoneMatches.forEach(t => {
+        matches.forEach(t => {
           if (!existingIds.has(t.id)) filtered.push(t);
         });
       }
@@ -72,7 +80,7 @@ export default function UserDashboard({ trees = [], onViewCertificate, onGoToPla
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono uppercase bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-400/30 font-bold">
-                  ค้นหาด้วยเบอร์โทร
+                  ระบบติดตามต้นไม้
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">
@@ -86,15 +94,15 @@ export default function UserDashboard({ trees = [], onViewCertificate, onGoToPla
         </div>
       </div>
 
-      {/* Phone Number Search Bar */}
+      {/* Search Bar */}
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-emerald-900/10 flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
-          <Phone className="w-4 h-4 text-emerald-700 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-emerald-700 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="กรอกเบอร์โทรศัพท์ที่ใช้ร่วมปลูกเพื่อค้นหากล้าไม้ของคุณ..."
-            value={searchPhone}
-            onChange={(e) => setSearchPhone(e.target.value)}
+            placeholder="ค้นหาด้วยเบอร์โทรศัพท์ ชื่อ หรือเลขต้นไม้..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 text-sm bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
           />
         </div>
@@ -124,7 +132,7 @@ export default function UserDashboard({ trees = [], onViewCertificate, onGoToPla
             <div className="max-w-md mx-auto space-y-1">
               <h3 className="font-bold text-stone-800 text-base">ยังไม่พบข้อมูลกล้าไม้สักของคุณ</h3>
               <p className="text-xs text-stone-500">
-                หากคุณเพิ่งร่วมปลูกสำเร็จ สามารถค้นหาด้วยเบอร์โทรศัพท์ที่ใช้ลงทะเบียนร่วมปลูกได้ทันที หรือเลือกเมนู "ร่วมปลูก" ด้านบน
+                หากคุณเพิ่งร่วมปลูกสำเร็จ สามารถค้นหาด้วยเบอร์โทรศัพท์ ชื่อ หรือหมายเลขต้นไม้ได้ทันที หรือเลือกเมนู "ร่วมปลูก" ด้านบน
               </p>
             </div>
           </div>

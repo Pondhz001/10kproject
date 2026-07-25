@@ -1,397 +1,211 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  getDocs, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  query, 
-  orderBy, 
-  getDocFromServer 
-} from 'firebase/firestore';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { Tree, Order, CareUpdate } from './types';
-import firebaseConfig from '../firebase-applet-config.json';
+import mongoose from 'mongoose';
+import { Tree, Order, CareUpdate, UserProfile } from './types';
 
-const DATA_STORE_PATH = path.join(process.cwd(), 'data_store.json');
+// Mongoose Schemas
+const CareUpdateSchema = new mongoose.Schema({
+  date: String,
+  status: String,
+  height: Number,
+  image: String,
+  note: String,
+});
 
-interface LocalStoreData {
-  trees: Tree[];
-  orders: Order[];
-}
+const TreeSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  index: { type: Number, unique: true, required: true },
+  ownerName: String,
+  ownerOrganization: String,
+  ownerPhone: String,
+  userId: String,
+  plantedAt: String,
+  status: { type: String, enum: ['Seedling', 'Growing', 'Young Tree', 'Mature'] },
+  height: Number,
+  carbonOffset: Number,
+  careHistory: [CareUpdateSchema],
+  slipDetails: {
+    transDate: String,
+    transTime: String,
+    senderName: String,
+    receiverName: String,
+    amount: Number,
+    refId: String,
+    sendingBank: String,
+  }
+});
 
-// Check if Firebase config is a placeholder
-const isConfigPlaceholder = 
-  !firebaseConfig || 
-  firebaseConfig.projectId === 'remixed-project-id' || 
-  !firebaseConfig.projectId;
+const OrderSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  donorName: String,
+  donorOrganization: String,
+  donorPhone: String,
+  userId: String,
+  treeCount: Number,
+  amount: Number,
+  status: { type: String, enum: ['Pending', 'Paid', 'Failed'] },
+  slipVerified: Boolean,
+  selectedTreeIndexes: [Number],
+  treeNames: [String],
+  slipDetails: {
+    transDate: String,
+    transTime: String,
+    senderName: String,
+    receiverName: String,
+    amount: Number,
+    refId: String,
+    sendingBank: String,
+  },
+  createdAt: String,
+});
 
-let useFirestore = false;
-let db: any = null;
+const UserProfileSchema = new mongoose.Schema({
+  uid: { type: String, unique: true, required: true },
+  displayName: String,
+  email: String,
+  photoURL: String,
+  phone: String,
+  provider: String,
+  lineUserId: String,
+  pictureUrl: String,
+  createdAt: String,
+});
 
-// Initialize Firebase and test connection
-async function initFirebaseAndTest() {
-  if (isConfigPlaceholder) {
-    console.log('Firebase configuration is a placeholder. Falling back to local data_store.json storage.');
-    useFirestore = false;
+// Models
+const TreeModel = mongoose.models.Tree || mongoose.model('Tree', TreeSchema);
+const OrderModel = mongoose.models.Order || mongoose.model('Order', OrderSchema);
+const UserProfileModel = mongoose.models.UserProfile || mongoose.model('UserProfile', UserProfileSchema);
+
+let isConnected = false;
+let connectionPromise = null;
+
+export async function connectDB() {
+  if (isConnected && mongoose.connection.readyState === 1) return;
+  if (!process.env.MONGODB_URI) {
+    const msg = 'MONGODB_URI is not set in environment variables. Please set it.';
+    console.error(msg);
+    throw new Error(msg);
+  }
+  
+  if (connectionPromise) {
+    await connectionPromise;
     return;
   }
+
   try {
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-    const dbId = (firebaseConfig as any).firestoreDatabaseId || (firebaseConfig as any).databaseId;
-    db = dbId ? getFirestore(app, dbId) : getFirestore(app);
-    // Test connection with getDocFromServer
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log('Successfully connected to Firebase Firestore!');
-    useFirestore = true;
-  } catch (error) {
-    console.warn('Failed to connect to Firebase Firestore:', error);
-    console.log('Falling back to local data_store.json storage.');
-    useFirestore = false;
-  }
-}
-
-// Call initialization
-initFirebaseAndTest();
-
-// Error handling helpers
-export enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-export interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-    tenantId?: string | null;
-    providerInfo?: {
-      providerId?: string | null;
-      email?: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: null,
-      email: null,
-      emailVerified: null,
-      isAnonymous: null,
-      tenantId: null,
-      providerInfo: []
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
-
-// Helper to read local data_store.json (Fallback)
-async function readLocalStore(): Promise<LocalStoreData> {
-  try {
-    const data = await fs.readFile(DATA_STORE_PATH, 'utf8');
-    return JSON.parse(data) as LocalStoreData;
+    // Remove bufferCommands: false to let mongoose handle it natively, or keep it but rely on connectionPromise.
+    // mongoose.set('bufferCommands', false); 
+    
+    connectionPromise = mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+    });
+    await connectionPromise;
+    isConnected = true;
+    console.log('Successfully connected to MongoDB!');
   } catch (err) {
-    console.warn('Failed to read local data_store.json, returning empty structure:', err);
-    return { trees: [], orders: [] };
-  }
-}
-
-// Helper to write local data_store.json (Fallback)
-async function writeLocalStore(data: LocalStoreData): Promise<void> {
-  try {
-    await fs.writeFile(DATA_STORE_PATH, JSON.stringify(data, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Failed to write to local data_store.json:', err);
+    connectionPromise = null;
+    console.error('Failed to connect to MongoDB:', err);
+    throw new Error('Database connection failed. Please check your IP whitelist on MongoDB Atlas and your MONGODB_URI: ' + err.message);
   }
 }
 
 export class LocalDb {
   public static async getTrees(): Promise<Tree[]> {
-    if (useFirestore && db) {
-      const pathForGet = 'trees';
-      try {
-        const q = query(collection(db, pathForGet), orderBy('index', 'asc'));
-        const snap = await getDocs(q);
-        const trees: Tree[] = [];
-        snap.forEach(docSnap => {
-          trees.push({ id: docSnap.id, ...docSnap.data() } as Tree);
-        });
-        return trees;
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, pathForGet);
-      }
-    }
-
-    // Local Fallback
-    const localData = await readLocalStore();
-    return (localData.trees || []).sort((a, b) => a.index - b.index);
+    await connectDB();
+    const trees = await TreeModel.find().sort({ index: 1 }).lean();
+    return trees as unknown as Tree[];
   }
 
   public static async addTree(tree: Omit<Tree, 'id' | 'index'> & { index?: number }): Promise<Tree> {
+    await connectDB();
     const id = `t-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     let index = tree.index;
     
-    // Find first available index starting from 100001 if index not provided
     if (!index) {
-      const trees = await this.getTrees();
-      const takenIndexes = new Set(trees.map(t => t.index));
-      index = 100001;
-      while (takenIndexes.has(index)) {
-        index++;
+      // Find first available index starting from 100001
+      const lastTree = await TreeModel.findOne().sort({ index: -1 }).lean();
+      if (lastTree && lastTree.index >= 100001) {
+        // Need to find gaps or just next
+        const allTrees = await TreeModel.find({} as any, 'index').lean();
+        const takenIndexes = new Set(allTrees.map(t => t.index));
+        index = 100001;
+        while (takenIndexes.has(index)) {
+          index++;
+        }
+      } else {
+        index = 100001;
       }
     }
 
-    const newTree: Tree = {
-      ...tree,
-      id,
-      index
-    };
-
-    if (useFirestore && db) {
-      const pathForWrite = `trees/${id}`;
-      try {
-        await setDoc(doc(db, 'trees', id), newTree);
-        return newTree;
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, pathForWrite);
-      }
-    }
-
-    // Local Fallback
-    const localData = await readLocalStore();
-    localData.trees = localData.trees || [];
-    localData.trees.push(newTree);
-    await writeLocalStore(localData);
-
-    return newTree;
+    const newTree = new TreeModel({ ...tree, id, index });
+    await newTree.save();
+    return newTree.toObject() as unknown as Tree;
   }
 
   public static async updateTree(id: string, updates: Partial<Tree>): Promise<Tree | null> {
-    if (useFirestore && db) {
-      const pathForWrite = `trees/${id}`;
-      try {
-        const docRef = doc(db, 'trees', id);
-        await updateDoc(docRef, updates);
-        const snap = await getDoc(docRef);
-        return snap.exists() ? ({ id: snap.id, ...snap.data() } as Tree) : null;
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, pathForWrite);
-      }
-    }
-
-    // Local Fallback
-    const localData = await readLocalStore();
-    const treeIndex = localData.trees.findIndex(t => t.id === id);
-    if (treeIndex !== -1) {
-      localData.trees[treeIndex] = {
-        ...localData.trees[treeIndex],
-        ...updates
-      };
-      await writeLocalStore(localData);
-      return localData.trees[treeIndex];
-    }
-    return null;
+    await connectDB();
+    const tree = await TreeModel.findOneAndUpdate({ id } as any, { $set: updates }, { new: true, upsert: false }).lean();
+    return tree as unknown as Tree | null;
   }
 
   public static async addCareUpdate(treeId: string, update: CareUpdate): Promise<Tree | null> {
-    if (useFirestore && db) {
-      const pathForWrite = `trees/${treeId}`;
-      try {
-        const docRef = doc(db, 'trees', treeId);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          const tree = snap.data() as Tree;
-          const careHistory = [...(tree.careHistory || []), update];
-          
-          const height = update.height;
-          let status = tree.status;
-          if (height >= 150) {
-            status = 'Mature';
-          } else if (height >= 100) {
-            status = 'Young Tree';
-          } else if (height >= 50) {
-            status = 'Growing';
-          } else {
-            status = 'Seedling';
-          }
-
-          const carbonOffset = Number((height * 0.1).toFixed(1));
-
-          const updates = {
-            height,
-            status,
-            carbonOffset,
-            careHistory
-          };
-
-          await updateDoc(docRef, updates);
-          return {
-            ...tree,
-            ...updates
-          };
-        }
-        return null;
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, pathForWrite);
-      }
-    }
-
-    // Local Fallback
-    const localData = await readLocalStore();
-    const treeIndex = localData.trees.findIndex(t => t.id === treeId);
-    if (treeIndex !== -1) {
-      const tree = localData.trees[treeIndex];
-      const careHistory = [...(tree.careHistory || []), update];
-      
+    await connectDB();
+    const tree = await TreeModel.findOne({ id: treeId } as any);
+    if (tree) {
+      tree.careHistory.push(update);
       const height = update.height;
-      let status = tree.status;
-      if (height >= 150) {
-        status = 'Mature';
-      } else if (height >= 100) {
-        status = 'Young Tree';
-      } else if (height >= 50) {
-        status = 'Growing';
-      } else {
-        status = 'Seedling';
-      }
-
-      const carbonOffset = Number((height * 0.1).toFixed(1));
-
-      localData.trees[treeIndex] = {
-        ...tree,
-        height,
-        status,
-        carbonOffset,
-        careHistory
-      };
-
-      await writeLocalStore(localData);
-      return localData.trees[treeIndex];
+      if (height >= 150) tree.status = 'Mature';
+      else if (height >= 100) tree.status = 'Young Tree';
+      else if (height >= 50) tree.status = 'Growing';
+      else tree.status = 'Seedling';
+      
+      tree.carbonOffset = Number((height * 0.1).toFixed(1));
+      tree.height = height;
+      
+      await tree.save();
+      return tree.toObject() as unknown as Tree;
     }
     return null;
   }
 
   public static async getOrders(): Promise<Order[]> {
-    if (useFirestore && db) {
-      const pathForGet = 'orders';
-      try {
-        const snap = await getDocs(collection(db, pathForGet));
-        const orders: Order[] = [];
-        snap.forEach(docSnap => {
-          orders.push({ id: docSnap.id, ...docSnap.data() } as Order);
-        });
-        return orders;
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, pathForGet);
-      }
-    }
-
-    // Local Fallback
-    const localData = await readLocalStore();
-    return localData.orders || [];
+    await connectDB();
+    const orders = await OrderModel.find().lean();
+    return orders as unknown as Order[];
   }
 
   public static async getOrder(id: string): Promise<Order | null> {
-    if (useFirestore && db) {
-      const pathForGet = `orders/${id}`;
-      try {
-        const docRef = doc(db, 'orders', id);
-        const snap = await getDoc(docRef);
-        return snap.exists() ? ({ id: snap.id, ...snap.data() } as Order) : null;
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, pathForGet);
-      }
-    }
-
-    // Local Fallback
-    const localData = await readLocalStore();
-    const order = localData.orders.find(o => o.id === id);
-    return order || null;
+    await connectDB();
+    const order = await OrderModel.findOne({ id } as any).lean();
+    return order as unknown as Order | null;
   }
 
   public static async addOrder(order: Omit<Order, 'id' | 'createdAt' | 'status' | 'slipVerified'> & { status?: 'Pending' | 'Paid' | 'Failed'; slipVerified?: boolean }): Promise<Order> {
+    await connectDB();
     const id = `ord-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const newOrder: Order = {
+    const newOrder = new OrderModel({
       ...order,
       id,
       status: order.status || 'Pending',
       slipVerified: order.slipVerified ?? false,
       createdAt: new Date().toISOString()
-    };
-
-    if (useFirestore && db) {
-      const pathForWrite = `orders/${id}`;
-      try {
-        await setDoc(doc(db, 'orders', id), newOrder);
-        return newOrder;
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, pathForWrite);
-      }
-    }
-
-    // Local Fallback
-    const localData = await readLocalStore();
-    localData.orders = localData.orders || [];
-    localData.orders.push(newOrder);
-    await writeLocalStore(localData);
-
-    return newOrder;
+    });
+    await newOrder.save();
+    return newOrder.toObject() as unknown as Order;
   }
 
   public static async updateOrder(id: string, updates: Partial<Order>): Promise<Order | null> {
-    if (useFirestore && db) {
-      const pathForWrite = `orders/${id}`;
-      try {
-        const docRef = doc(db, 'orders', id);
-        await updateDoc(docRef, updates);
-        const snap = await getDoc(docRef);
-        return snap.exists() ? ({ id: snap.id, ...snap.data() } as Order) : null;
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, pathForWrite);
-      }
-    }
-
-    // Local Fallback
-    const localData = await readLocalStore();
-    const orderIndex = localData.orders.findIndex(o => o.id === id);
-    if (orderIndex !== -1) {
-      localData.orders[orderIndex] = {
-        ...localData.orders[orderIndex],
-        ...updates
-      };
-      await writeLocalStore(localData);
-      return localData.orders[orderIndex];
-    }
-    return null;
+    await connectDB();
+    const order = await OrderModel.findOneAndUpdate({ id } as any, { $set: updates }, { new: true, upsert: false }).lean();
+    return order as unknown as Order | null;
   }
 
   public static async saveUserProfile(user: any): Promise<any> {
-    if (useFirestore && db && user?.uid) {
-      const cleanUid = user.uid.replace(/[^a-zA-Z0-9_-]/g, '_');
-      try {
-        await setDoc(doc(db, 'users', cleanUid), user, { merge: true });
-        return user;
-      } catch (error) {
-        console.warn('Firestore user save failed, falling back to memory/local', error);
-      }
-    }
-    return user;
+    if (!user || !user.uid) return user;
+    await connectDB();
+    const cleanUid = user.uid.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const updated = await UserProfileModel.findOneAndUpdate({ uid: cleanUid } as any,
+      { $set: user },
+      { new: true, upsert: true }
+    ).lean();
+    return updated;
   }
 }
