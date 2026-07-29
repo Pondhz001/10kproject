@@ -3,66 +3,66 @@ import re
 with open("server.ts", "r") as f:
     content = f.read()
 
-pledge_handler_regex = r"      const order = await LocalDb\.addOrder\(\{.*?\}\);\n\n      res\.json\(\{\n        success: true,\n        order,\n        message: 'สร้างรายการร่วมปลูกเรียบร้อยแล้ว กรุณาชำระเงินผ่าน QR Code'\n      \}\);"
+# Remove startServer
+content = content.replace(
+    'const app = express();\n\nasync function startServer() {\n  try {\n    await connectDB();\n    console.log("MongoDB Connection Initialized successfully");\n  } catch (err) {\n    console.error("Failed to connect to MongoDB on startup:", err);\n    if (process.env.NODE_ENV !== "production") process.exit(1);\n  }',
+    'const app = express();\nconnectDB().catch(console.error);'
+)
 
-replacement = r"""      const order = await LocalDb.addOrder({
-        donorName,
-        donorOrganization: org,
-        donorPhone,
-        userId: userId || '',
-        treeCount: Number(treeCount),
-        amount,
-        status: 'Pending',
-        slipVerified: false,
-        selectedTreeIndexes: selectedTreeIndexes || [],
-        treeNames: treeNames || []
-      });
+# Fix Vite async middleware
+content = content.replace(
+    '''  // ==========================================
+  // Vite Server Setup for Client Assets
+  // ==========================================
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {''',
+    '''  // ==========================================
+  // Vite Server Setup for Client Assets
+  // ==========================================
+  if (process.env.NODE_ENV !== 'production') {
+    createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    }).then(vite => {
+      app.use(vite.middlewares);
+    });
+  } else {'''
+)
 
-      const createdTrees = [];
-      const actualTreeNames = treeNames || [];
-      const indexesToUse = selectedTreeIndexes && selectedTreeIndexes.length > 0 
-        ? selectedTreeIndexes 
-        : Array.from({length: Number(treeCount)}).map(() => null);
+content = content.replace(
+    '''    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
 
-      for (let i = 0; i < Number(treeCount); i++) {
-        const nameToUse = actualTreeNames[i] || donorName;
-        const indexToUse = indexesToUse[i];
-        
-        const treeParams: any = {
-          ownerName: nameToUse,
-          ownerOrganization: org,
-          ownerPhone: donorPhone,
-          userId: userId || '',
-          plantedAt: new Date().toISOString(),
-          status: 'Seedling',
-          height: 15,
-          carbonOffset: 0,
-          careHistory: [{
-            date: new Date().toISOString().split('T')[0],
-            status: 'Seedling',
-            height: 15,
-            image: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=300&q=80',
-            note: 'ลงทะเบียนกล้าไม้สักลงในระบบแผนที่เรียบร้อย รอการตรวจสอบยอดเงินและการปักป้าย'
-          }]
-        };
+  if (process.env.NODE_ENV !== 'production' || process.env.RENDER || process.env.RAILWAY_ENVIRONMENT) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Muen Kla Pa Khiao Backend running on port ${PORT}`);
+    });
+  }
+}
 
-        if (indexToUse !== null) {
-          treeParams.index = indexToUse;
-        }
+export default app;''',
+    '''    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
 
-        const tree = await LocalDb.addTree(treeParams);
-        createdTrees.push(tree);
-      }
+  if (process.env.NODE_ENV !== 'production' || process.env.RENDER || process.env.RAILWAY_ENVIRONMENT) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Muen Kla Pa Khiao Backend running on port ${PORT}`);
+    });
+  }
 
-      res.json({
-        success: true,
-        order,
-        trees: createdTrees,
-        message: 'สร้างรายการร่วมปลูกเรียบร้อยแล้ว กรุณาชำระเงินผ่าน QR Code'
-      });"""
+export default app;'''
+)
 
-content = re.sub(pledge_handler_regex, replacement, content, flags=re.DOTALL)
 
 with open("server.ts", "w") as f:
     f.write(content)
-print("Done")
+print("Done refactoring server.ts")

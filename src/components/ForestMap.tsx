@@ -587,7 +587,7 @@ export default function ForestMap({ trees, onSelectTree, selectedTree, onJoinPla
                       )}
                       <div className="flex justify-between border-t border-emerald-100 pt-1.5 mt-1 font-bold">
                         <span>สถานะระบบ:</span>
-                        <span className="text-emerald-700 font-sans">รับรองสลิปสำเร็จ (slip2go)</span>
+                        <span className="text-emerald-700 font-sans">ตรวจสอบการโอนสำเร็จ</span>
                       </div>
                     </div>
                   )}
@@ -1025,7 +1025,7 @@ export default function ForestMap({ trees, onSelectTree, selectedTree, onJoinPla
                   {selectedTree.slipDetails && (
                     <div className="border-t border-stone-200 pt-3 mt-2 space-y-1.5 text-[11px] text-stone-600">
                       <p className="text-emerald-700 font-sans font-bold text-xs mb-2 flex items-center gap-1">
-                        <CheckCircle className="w-3.5 h-3.5" /> ตรวจสอบผ่านระบบ slip2go สำเร็จ
+                        <CheckCircle className="w-3.5 h-3.5" /> ตรวจสอบการโอนสำเร็จ
                       </p>
                       {selectedTree.slipDetails.senderName && (
                         <div className="flex justify-between">

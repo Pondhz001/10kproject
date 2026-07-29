@@ -6,7 +6,6 @@ import CertificateCanvas from './components/CertificateCanvas';
 import PoetryNarrator from './components/PoetryNarrator';
 import AboutCampaign from './components/AboutCampaign';
 import AdminDashboard from './components/AdminDashboard';
-import VerifyPlanting from './components/VerifyPlanting';
 import HomeCampaign from './components/HomeCampaign';
 import BrandLogo from './components/BrandLogo';
 import UserDashboard from './components/UserDashboard';
@@ -245,29 +244,13 @@ export default function App() {
                   setActiveTab('plant');
                 }}
                 className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'new'
+                  activeTab === 'plant'
                     ? 'bg-emerald-700 text-white shadow-sm font-black'
                     : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
                 }`}
               >
-                <Sparkles className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'new' ? 'text-amber-300' : 'text-amber-500'}`} />
-                ร่วมปลูก (สมาชิก)
-              </button>
-
-              <button
-                onClick={() => {
-                  setPlantMode('member');
-                  setPlantSubTab('verify');
-                  setActiveTab('plant');
-                }}
-                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'verify'
-                    ? 'bg-emerald-700 text-white shadow-sm font-black'
-                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
-                }`}
-              >
-                <CheckCircle className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'verify' ? 'text-amber-300' : 'text-emerald-600'}`} />
-                แจ้งโอนเงิน/ยืนยันการซื้อ
+                <Sparkles className={`w-4 h-4 ${activeTab === 'plant' ? 'text-amber-300' : 'text-emerald-600'}`} />
+                ร่วมปลูก
               </button>
 
 
@@ -325,6 +308,23 @@ export default function App() {
               <button
                 onClick={() => {
                   checkAdminAndExecute(() => {
+                    setPlantMode('member');
+                    setPlantSubTab('new');
+                    setActiveTab('plant');
+                  });
+                }}
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'new'
+                    ? 'bg-amber-500 text-stone-950 shadow-sm font-black border border-amber-400'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-100/50'
+                }`}
+              >
+                <Sparkles className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'new' ? 'text-stone-950' : 'text-amber-700'}`} />
+                สร้างฟอร์ม (สมาชิก)
+              </button>
+              <button
+                onClick={() => {
+                  checkAdminAndExecute(() => {
                     setPlantMode('admin');
                     setActiveTab('plant');
                   });
@@ -343,92 +343,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Campaign Stats Dashboard (Bento Grid) - Conditionally hidden on Home tab */}
-      {activeTab !== 'home' && (
-        <section className="bg-[#e9f0e9] border-b border-emerald-900/5 py-8 relative overflow-hidden">
-          {/* Decorative elements */}
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-600/5 rounded-full blur-3xl pointer-events-none" />
-          
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" id="campaign-bento-grid">
-            
-            {/* Total Goal */}
-            <div className="bg-white border border-emerald-900/10 p-5 rounded-3xl flex flex-col justify-between shadow-sm hover:border-emerald-500/30 transition">
-              <div className="flex justify-between items-center text-stone-400">
-                <span className="text-xs font-semibold font-mono uppercase tracking-wider">เป้าหมายโครงการ</span>
-                <EcoIcon className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div className="mt-4">
-                <p className="text-2xl lg:text-3xl font-black text-stone-900 font-mono">
-                  {stats.totalTarget.toLocaleString()}
-                </p>
-                <div className="flex justify-between items-center mt-1 text-[10px] text-stone-500">
-                  <span>ต้นกล้าไม้สัก</span>
-                  <span className="text-emerald-700 font-semibold">100% สักสายพันธุ์ดี</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Total Planted */}
-            <div className="bg-white border border-emerald-900/10 p-5 rounded-3xl flex flex-col justify-between shadow-sm hover:border-emerald-500/30 transition">
-              <div className="flex justify-between items-center text-stone-400">
-                <span className="text-xs font-semibold font-mono uppercase tracking-wider">ปลูกแล้วสำเร็จ</span>
-                <CheckCircle className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div className="mt-4">
-                <p className="text-2xl lg:text-3xl font-black text-stone-900 font-mono flex items-baseline gap-1.5">
-                  {stats.totalPlanted.toLocaleString()}
-                  <span className="text-xs font-semibold text-emerald-600">
-                    ({((stats.totalPlanted / stats.totalTarget) * 100).toFixed(1)}%)
-                  </span>
-                </p>
-                {/* Visual Progress bar */}
-                <div className="w-full bg-[#f0f4f0] h-1.5 rounded-full mt-2 overflow-hidden">
-                  <div
-                     style={{ width: `${(stats.totalPlanted / stats.totalTarget) * 100}%` }}
-                     className="bg-gradient-to-r from-emerald-500 to-amber-500 h-full rounded-full"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Carbon Offset */}
-            <div className="bg-white border border-emerald-900/10 p-5 rounded-3xl flex flex-col justify-between shadow-sm hover:border-emerald-500/30 transition">
-              <div className="flex justify-between items-center text-stone-400">
-                <span className="text-xs font-semibold font-mono uppercase tracking-wider">ดูดซับคาร์บอนสะสม</span>
-                <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-              </div>
-              <div className="mt-4">
-                <p className="text-2xl lg:text-3xl font-black text-stone-900 font-mono">
-                  {stats.totalCO2Offset.toLocaleString()} <span className="text-xs text-stone-500 font-normal">กก./ปี</span>
-                </p>
-                <p className="text-[10px] text-stone-500 mt-1">
-                  ลดปริมาณก๊าซเรือนกระจกเพื่อโลกสีเขียว
-                </p>
-              </div>
-            </div>
-
-            {/* Total Donors */}
-            <div className="bg-white border border-emerald-900/10 p-5 rounded-3xl flex flex-col justify-between shadow-sm hover:border-emerald-500/30 transition">
-              <div className="flex justify-between items-center text-stone-400">
-                <span className="text-xs font-semibold font-mono uppercase tracking-wider">จำนวนผู้ร่วมปลูก</span>
-                <Users className="w-4 h-4 text-amber-500" />
-              </div>
-              <div className="mt-4">
-                <p className="text-2xl lg:text-3xl font-black text-stone-900 font-mono">
-                  {stats.totalDonors.toLocaleString()} <span className="text-xs text-stone-500 font-normal">คน</span>
-                </p>
-                <p className="text-[10px] text-amber-700/80 mt-1">
-                  ร่วมสร้างทานบารมี คืนชีวิตสู่แผ่นดิน
-                </p>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-      )}
+      
 
       {/* Main Feature Content Router Panel */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -613,7 +528,7 @@ export default function App() {
                 setPreSelectedTreeIndexes={setPreSelectedTreeIndexes}
                 trees={trees}
                 initialMemberMode={plantMode === 'member'}
-                isAdmin={isAdmin}
+                isAdmin={isAdmin && plantMode === 'admin'}
                 initialSubTab={plantSubTab}
                 onNavigateToMyTrees={() => setActiveTab('my-trees')}
               />
@@ -655,7 +570,7 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4 text-stone-500">
-            <span>Slip Verification by slip2go</span>
+            <span></span>
             <span>•</span>
             <span>ระบบลงทะเบียนกล้าไม้สักอุปถัมภ์</span>
           </div>

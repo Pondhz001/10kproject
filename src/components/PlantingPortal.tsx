@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tree, Order } from '../types';
-import { ShoppingBag, QrCode, UploadCloud, FileImage, ShieldCheck, HelpCircle, CheckCircle, Trees, Loader2, Sparkles, Download, LogIn, LogOut, ExternalLink, HardDrive, Building2, UserCheck, MessageCircle } from 'lucide-react';
+import { MessageCircle, Copy, CheckCircle, Trees, Loader2, Sparkles, Plus, X, QrCode, Map } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import VerifyPlanting from './VerifyPlanting';
+
+import ForestMap from './ForestMap';
 
 interface PlantingPortalProps {
   onOrderCompleted: (order: Order, newTrees: Tree[]) => void;
@@ -18,889 +19,372 @@ interface PlantingPortalProps {
   initialSubTab?: 'new' | 'verify';
 }
 
-// CRC16 CCITT Standard for Thai PromptPay QR Code
-function crc16(str: string): string {
-  let crc = 0xFFFF;
-  for (let c = 0; c < str.length; c++) {
-    const charCode = str.charCodeAt(c);
-    let x = ((crc >> 8) ^ charCode) & 0xFF;
-    x ^= x >> 4;
-    crc = ((crc << 8) ^ (x << 12) ^ (x << 5) ^ x) & 0xFFFF;
-  }
-  return crc.toString(16).toUpperCase().padStart(4, '0');
-}
-
-// Generate PromptPay EMVCo Payload
-function generatePromptPayPayload(amount: number, phoneNumber: string = '0817960622'): string {
-  const targetPP = phoneNumber.startsWith('0') 
-    ? `0066${phoneNumber.substring(1)}` 
-    : phoneNumber;
-  
-  // Account Info Field
-  const accountInfo = `0016A0000006770101110113${targetPP}`;
-  const merchantField = `29${accountInfo.length}${accountInfo}`;
-  
-  // Amount Field
-  const amountStr = Number(amount).toFixed(2);
-  const amountField = `54${String(amountStr.length).padStart(2, '0')}${amountStr}`;
-  
-  // Construct baseline payload
-  let payload = `000201010211${merchantField}5303764${amountField}5802TH6304`;
-  const checksum = crc16(payload);
-  return payload + checksum;
-}
-
-export default function PlantingPortal({
+const PlantingPortal: React.FC<PlantingPortalProps> = ({ 
   onOrderCompleted,
-  preSelectedTreeIndex,
-  setPreSelectedTreeIndex,
-  preSelectedTreeIndexes,
-  setPreSelectedTreeIndexes,
-  trees,
-  initialMemberMode = false,
-  isAdmin = false,
-  onNavigateToMyTrees,
   onOrderCreated,
-  initialSubTab = 'new'
-}: PlantingPortalProps) {
-  // Google Drive & Member Authentication State
-  const [isMemberMode, setIsMemberMode] = useState(!isAdmin ? true : initialMemberMode);
-  const [subTab, setSubTab] = useState<'new' | 'verify'>(initialSubTab);
-
-  React.useEffect(() => {
-    if (!isAdmin) {
-      setIsMemberMode(true);
-    } else {
-      setIsMemberMode(initialMemberMode);
-    }
-  }, [initialMemberMode, isAdmin]);
-
-  // Order Form State
+  preSelectedTreeIndexes = [],
+  setPreSelectedTreeIndexes,
+  trees
+}) => {
   const [donorName, setDonorName] = useState('');
   const [donorOrganization, setDonorOrganization] = useState('');
   const [donorPhone, setDonorPhone] = useState('');
-  const [treeCount, setTreeCount] = useState(1);
-  const [useSeparateNames, setUseSeparateNames] = useState(false);
-  const [separateNames, setSeparateNames] = useState<string[]>([]);
+  const [treeCount, setTreeCount] = useState<number>(preSelectedTreeIndexes?.length || 1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successOrder, setSuccessOrder] = useState<Order | null>(null);
+  const [newlyPlantedTrees, setNewlyPlantedTrees] = useState<Tree[]>([]);
+  const [copied, setCopied] = useState(false);
   
-  React.useEffect(() => {
-    setSubTab(initialSubTab);
-  }, [initialSubTab]);
+  const [inputIndex, setInputIndex] = useState(''); 
 
-  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verifyCodeError, setVerifyCodeError] = useState<string | null>(null);
-  const [donorNameError, setDonorNameError] = useState(false);
-  const [donorPhoneError, setDonorPhoneError] = useState(false);
-
-  // Post payment modal prompt
-
-  // Sync separateNames length with treeCount
-  React.useEffect(() => {
-    setSeparateNames(prev => {
-      const arr = [...prev];
-      if (arr.length < treeCount) {
-        while (arr.length < treeCount) {
-          arr.push('');
-        }
-      } else if (arr.length > treeCount) {
-        arr.length = treeCount;
-      }
-      return arr;
-    });
-  }, [treeCount]);
-
-  // Seedling Number Selector State
-  const [selectedStartIndex, setSelectedStartIndex] = useState<number>(100001);
-  const [manualIndexInput, setManualIndexInput] = useState('');
-  const [manualInputError, setManualInputError] = useState<string | null>(null);
-  const [verifyError, setVerifyError] = useState<string | null>(null);
-
-  // Pre-calculate taken indexes
-  const takenIndexes = React.useMemo(() => new Set(trees.map(t => t.index)), [trees]);
-
-  // First available starting index
-  const firstAvailableIndex = React.useMemo(() => {
-    let current = 100001;
-    while (takenIndexes.has(current)) {
-      current++;
-    }
-    return current;
-  }, [takenIndexes]);
-
-  // Sync starting index if preSelectedTreeIndex or preSelectedTreeIndexes changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (preSelectedTreeIndexes && preSelectedTreeIndexes.length > 0) {
       setTreeCount(preSelectedTreeIndexes.length);
-      setSelectedStartIndex(preSelectedTreeIndexes[0]);
-    } else if (preSelectedTreeIndex) {
-      setSelectedStartIndex(preSelectedTreeIndex);
-      setManualIndexInput(String(preSelectedTreeIndex));
-    } else {
-      setSelectedStartIndex(firstAvailableIndex);
-      setManualIndexInput('');
     }
-  }, [preSelectedTreeIndex, preSelectedTreeIndexes, firstAvailableIndex]);
+  }, [preSelectedTreeIndexes]);
 
-  // Helper to assign count consecutive available indexes
-  const getAssignedIndexes = (start: number, count: number, taken: Set<number>) => {
-    const assigned: number[] = [];
-    let current = start;
-    while (assigned.length < count && current <= 110000) {
-      if (!taken.has(current)) {
-        assigned.push(current);
+  const availableOptions = useMemo(() => {
+    const takenIndexes = new Set(trees.map(t => t.index));
+    const opts = [];
+    for (let i = 100001; i <= 110000 && opts.length < 50; i++) {
+      if (!takenIndexes.has(i) && !preSelectedTreeIndexes.includes(i)) {
+        opts.push(i);
       }
-      current++;
     }
-    return assigned;
+    return opts;
+  }, [trees, preSelectedTreeIndexes]);
+
+  const handleAddIndex = () => {
+    const idx = parseInt(inputIndex);
+    if (idx >= 100001 && idx <= 110000) {
+      if (trees.some(t => t.index === idx)) {
+        setErrorMsg(`พิกัดต้นไม้ #${idx} มีผู้อุปถัมภ์แล้ว`);
+      } else if (preSelectedTreeIndexes.includes(idx)) {
+        setErrorMsg(`คุณได้เลือกพิกัด #${idx} ไปแล้ว`);
+      } else {
+        if (setPreSelectedTreeIndexes) {
+          setPreSelectedTreeIndexes([...preSelectedTreeIndexes, idx]);
+        }
+        setInputIndex('');
+        setErrorMsg('');
+      }
+    } else {
+      setErrorMsg('หมายเลขต้นไม้ต้องอยู่ระหว่าง 100001 - 110000');
+    }
   };
 
-  // Currently assigned indexes for the order
-  const assignedIndexes = React.useMemo(() => {
-    if (preSelectedTreeIndexes && preSelectedTreeIndexes.length > 0) {
-      return preSelectedTreeIndexes;
-    }
-    return getAssignedIndexes(selectedStartIndex, treeCount, takenIndexes);
-  }, [preSelectedTreeIndexes, selectedStartIndex, treeCount, takenIndexes]);
-
-  // Generate list of 100 available seedling choices
-  const availableChoices = React.useMemo(() => {
-    const choices: number[] = [];
-    let current = 100001;
-    if (preSelectedTreeIndex && !takenIndexes.has(preSelectedTreeIndex)) {
-      choices.push(preSelectedTreeIndex);
-    }
-    while (choices.length < 100 && current <= 110000) {
-      if (!takenIndexes.has(current) && current !== preSelectedTreeIndex) {
-        choices.push(current);
-      }
-      current++;
-    }
-    return choices.sort((a, b) => a - b);
-  }, [takenIndexes, preSelectedTreeIndex]);
-
-  // Handler for manual seedling input
-  const handleManualIndexChange = (val: string) => {
-    setManualIndexInput(val);
-    if (!val) {
-      setManualInputError(null);
-      setSelectedStartIndex(firstAvailableIndex);
-      return;
-    }
-
-    const num = parseInt(val);
-    if (isNaN(num) || num < 100001 || num > 110000) {
-      setManualInputError('รหัสต้องอยู่ระหว่าง 100001 - 110000');
-    } else if (takenIndexes.has(num)) {
-      setManualInputError(`หมายเลข #${num} มีผู้ร่วมปลูกแล้ว`);
-    } else {
-      setManualInputError(null);
-      setSelectedStartIndex(num);
+  const handleRemoveIndex = (idx: number) => {
+    if (setPreSelectedTreeIndexes) {
+      setPreSelectedTreeIndexes(preSelectedTreeIndexes.filter(i => i !== idx));
     }
   };
-  
-  // Current Order Session State
-  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
-  
-  // File Slip Upload State
-  const [verifyStep, setVerifyStep] = useState('');
 
-
-  const handleCreateOrder = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    let hasError = false;
-    if (!donorName.trim()) {
-      setDonorNameError(true);
-      hasError = true;
-    } else {
-      setDonorNameError(false);
-    }
-
-    if (!donorPhone.trim()) {
-      setDonorPhoneError(true);
-      hasError = true;
-    } else {
-      setDonorPhoneError(false);
-    }
-
-    if (manualInputError) {
-      setVerifyError(manualInputError);
+    if (!donorName || !donorPhone) {
+      setErrorMsg('กรุณากรอกชื่อและเบอร์โทรติดต่อ');
       return;
     }
-
-    if (hasError) {
-      setVerifyError('กรุณากรอกข้อมูลผู้ร่วมปลูกและเบอร์โทรศัพท์ให้ครบถ้วนก่อนร่วมปลูก');
-      return;
-    }
-
-    setIsSubmittingOrder(true);
-    setVerifyError(null);
-
-    const finalTreeNames = useSeparateNames 
-      ? separateNames.map((name, i) => name.trim() || `${donorName} (ต้นที่ ${i + 1})`)
-      : Array(treeCount).fill(donorName);
-
+    
+    setIsSubmitting(true);
+    setErrorMsg('');
+    
     try {
-      const response = await fetch('/api/forest/pledge', {
+      const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           donorName,
-          organization: donorOrganization,
           donorOrganization,
           donorPhone,
-          treeCount,
-          selectedTreeIndexes: assignedIndexes,
-          treeNames: finalTreeNames,
-          userId: '',
-          isAdmin
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('ไม่สามารถบันทึกข้อมูลร่วมปลูกได้');
-      }
-
-      const responseData = await response.json();
-      if (responseData.order) {
-        if (responseData.order.status === 'Paid') {
-          onOrderCompleted(responseData.order, responseData.trees || []);
-        } else {
-          setActiveOrder(responseData.order);
-          if (onOrderCreated) onOrderCreated();
-        }
-      } else {
-        throw new Error('ไม่สามารถสร้างรายการร่วมปลูกได้');
-      }
-    } catch (err: any) {
-      setVerifyError(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
-    } finally {
-      setIsSubmittingOrder(false);
-    }
-  };
-
-  // Convert file to Base64
-
-
-  // Drag handlers
-
-
-
-
-  // Generate PromptPay String for amount
-  // Use static payment QR provided by user
-  const qrCodeUrl = '/payment-qr.jpeg';
-
-  const handleDownloadQR = () => {
-    const link = document.createElement('a');
-    link.href = qrCodeUrl;
-    link.download = 'muenkla-qr.jpg';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-
-  const handleVerifyCode = async () => {
-    if (!verificationCode.trim()) {
-      setVerifyCodeError('กรุณากรอกรหัสยืนยัน');
-      return;
-    }
-    
-    setIsVerifying(true);
-    setVerifyCodeError(null);
-    
-    try {
-      const response = await fetch('/api/orders/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: activeOrder?.id,
-          verificationCode
+          treeCount: Math.max(treeCount, preSelectedTreeIndexes?.length || 1),
+          selectedTreeIndexes: preSelectedTreeIndexes || []
         })
       });
       
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'ไม่สามารถยืนยันการปลูกได้');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'การลงทะเบียนล้มเหลว');
       }
       
-      onOrderCompleted(activeOrder!, []);
-      setActiveOrder(null);
+      setSuccessOrder(data.order || data);
+      setNewlyPlantedTrees(data.trees || []);
+      if (onOrderCreated) onOrderCreated();
+      if (setPreSelectedTreeIndexes) setPreSelectedTreeIndexes([]);
     } catch (err: any) {
-      setVerifyCodeError(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      setErrorMsg(err.message);
     } finally {
-      setIsVerifying(false);
+      setIsSubmitting(false);
     }
   };
+
+  const copyToClipboard = () => {
+    if (!successOrder) return;
+    const treeNumbers = newlyPlantedTrees.map(t => t.index).join(', ');
+    const text = `ขอร่วมอุปถัมภ์กล้าไม้ โครงการ 10K หมื่นกล้าป่าเขียว\nชื่อ: ${successOrder.donorName}\nองค์กร: ${successOrder.donorOrganization || '-'}\nติดต่อ: ${successOrder.donorPhone}\nจำนวน: ${successOrder.treeCount} ต้น (ยอดโอน ${successOrder.amount} บาท)\nพิกัดต้น: ${treeNumbers}\n\n(แนบสลิปการโอนเงินด้านล่างนี้ได้เลยครับ/ค่ะ)`;
+
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (successOrder) {
+        
+    return (
+      <div className="max-w-2xl mx-auto space-y-8 pb-12 pt-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white p-8 rounded-3xl shadow-xl border border-emerald-100 text-center space-y-6"
+        >
+          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-10 h-10 text-emerald-600" />
+          </div>
+          <h2 className="text-2xl font-black text-emerald-950">ลงทะเบียนสำเร็จ!</h2>
+          <p className="text-stone-600">
+            ระบบได้บันทึกข้อมูลและจองพิกัดต้นไม้ของคุณเรียบร้อยแล้ว 
+            กรุณาสแกน QR Code ด้านล่างเพื่อชำระเงิน จากนั้นคัดลอกข้อมูลและส่งให้เจ้าหน้าที่ทาง Line พร้อมสลิปโอนเงิน
+          </p>
+
+          <div className="flex flex-col items-center justify-center bg-stone-50 p-6 rounded-2xl border border-stone-200 space-y-4">
+            <h3 className="font-bold text-stone-800 flex items-center gap-2">
+               <QrCode className="w-5 h-5" /> 
+               สแกนเพื่อชำระเงิน ({successOrder.amount} บาท)
+            </h3>
+            <div className="p-4 bg-white rounded-xl shadow-sm border border-stone-100">
+               <img src="/payment-qr.jpeg" alt="QR Code" className="w-full max-w-[280px] h-auto object-contain rounded-lg mx-auto" />
+            </div>
+            <p className="text-xs font-bold text-stone-600 bg-amber-100 px-3 py-1 rounded-full">ยอดที่ต้องโอน: {successOrder.amount} บาท</p>
+          </div>
+
+          <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200 text-left font-mono text-sm text-stone-700 whitespace-pre-wrap relative">
+            ขอร่วมอุปถัมภ์กล้าไม้ โครงการ 10K หมื่นกล้าป่าเขียว<br />
+            ชื่อ: {successOrder.donorName}<br />
+            องค์กร: {successOrder.donorOrganization || '-'}<br />
+            ช่องทางติดต่อ: {successOrder.donorPhone}<br />
+            จำนวน: {successOrder.treeCount} ต้น (ยอดโอน {successOrder.amount} บาท)<br />
+            พิกัดต้น: {newlyPlantedTrees.map(t => t.index).join(', ')}<br /><br />
+            (แนบสลิปการโอนเงินด้านล่างนี้ได้เลยครับ/ค่ะ)
+          </div>
+
+          <div className="flex flex-col gap-3 pt-4">
+            <button
+              onClick={copyToClipboard}
+              className={`py-4 font-bold text-lg rounded-2xl transition shadow-sm flex items-center justify-center gap-2 ${
+                copied ? 'bg-stone-200 text-stone-700' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+              }`}
+            >
+              {copied ? <CheckCircle className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+              {copied ? 'คัดลอกแล้ว' : 'คัดลอกข้อมูลเพื่อส่ง Line'}
+            </button>
+            <a
+              href="https://lin.ee/Sv5qrGD"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="py-4 bg-[#00B900] hover:bg-[#009900] text-white font-black text-lg rounded-2xl transition shadow-xl hover:scale-[1.02] inline-flex items-center justify-center gap-3 no-underline"
+              onClick={() => onOrderCompleted(successOrder, newlyPlantedTrees)}
+            >
+              <MessageCircle className="w-6 h-6 animate-pulse" />
+              แอด Line แจ้งชำระเงินพร้อมสลิป
+            </a>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white border border-emerald-900/10 rounded-3xl p-6 lg:p-8 shadow-sm max-w-4xl mx-auto" id="planting-portal">
-      <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-950/5 rounded-full blur-3xl pointer-events-none" />
-      
+    <div className="max-w-4xl mx-auto space-y-12 pb-12 pt-4">
 
-      {isMemberMode && !isAdmin && (
-        <div className="flex space-x-6 border-b border-stone-200 mb-8 px-2 relative z-10">
-          <button
-            onClick={() => setSubTab('new')}
-            className={`px-4 py-2 text-sm font-bold flex items-center gap-2 border-b-2 transition ${
-              subTab === 'new' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-stone-500 hover:text-stone-700'
-            }`}
-          >
-            <Trees className="w-4 h-4" />
-            ร่วมปลูกใหม่
-          </button>
-          <button
-            onClick={() => setSubTab('verify')}
-            className={`px-4 py-2 text-sm font-bold flex items-center gap-2 border-b-2 transition ${
-              subTab === 'verify' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-stone-500 hover:text-stone-700'
-            }`}
-          >
-            <CheckCircle className="w-4 h-4" />
-            ใส่ Order ID ยืนยัน
-          </button>
-        </div>
-      )}
+      <div className="space-y-4">
+        <h3 className="text-xl font-black text-emerald-950 tracking-tight flex items-center gap-2">
+          <Map className="w-5 h-5 text-emerald-600" /> แผนที่กล้าไม้ในโครงการ
+        </h3>
+        <p className="text-sm text-stone-600 mb-4">
+          คลิกเลือกกล้าไม้ที่ต้องการอุปถัมภ์จากแผนที่ด้านล่าง ระบบจะเพิ่มลงในฟอร์มอัตโนมัติ (เลือกได้มากกว่า 1 ต้น)
+        </p>
+        <ForestMap 
+           trees={trees} 
+           onSelectTree={() => {}} 
+           selectedTree={null} 
+           onJoinPlantingMultiple={(indexes) => {
+               if (setPreSelectedTreeIndexes) setPreSelectedTreeIndexes(indexes);
+               // Scroll to form
+               document.getElementById('planting-form')?.scrollIntoView({ behavior: 'smooth' });
+           }} 
+        />
+      </div>
 
-      {subTab === 'verify' ? (
-        <VerifyPlanting onVerified={() => { if(onNavigateToMyTrees) onNavigateToMyTrees(); }} />
-      ) : (
-      <AnimatePresence mode="wait">
+      <motion.div 
+        id="planting-form"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid grid-cols-1 md:grid-cols-5 gap-8"
+      >
+        <div className="md:col-span-2 space-y-6">
+          <div className="space-y-3">
+            <h2 className="text-2xl lg:text-3xl font-black text-emerald-950 tracking-tight leading-tight">
+              ร่วมปลูกกล้าไม้สัก
+            </h2>
+            <p className="text-sm text-stone-600 leading-relaxed">
+              กรอกข้อมูลเพื่อลงทะเบียนรับพิกัดกล้าไม้ จากนั้นระบบจะเตรียมข้อมูลให้คุณคัดลอกไปส่งให้เจ้าหน้าที่ทาง Line
+            </p>
+          </div>
 
-        {!activeOrder ? (
-          // STEP 1: Buy / Order Form
-          <motion.div
-            key="order-form"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="grid grid-cols-1 md:grid-cols-5 gap-8"
-          >
-            {/* Project Campaign Details */}
-            <div className="md:col-span-2 space-y-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <img src="/logo.svg" alt="10K Logo" className="w-12 h-12 object-contain filter drop-shadow-xs" />
-                  <div>
-                    <span className="bg-amber-50 text-amber-800 border border-amber-200/50 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1 shadow-2xs">
-                      <Sparkles className="w-3 h-3 text-amber-500" /> Campaign 2026
-                    </span>
-                    <h2 className="text-2xl lg:text-3xl font-black text-emerald-950 tracking-tight leading-tight">
-                      10K หมื่นกล้าป่าเขียว
-                    </h2>
-                  </div>
-                </div>
-                <p className="text-sm text-stone-600 leading-relaxed">
-                  ร่วมลงทะเบียนบันทึกข้อมูลกล้าไม้สักคุณภาพสายพันธุ์ดีจำนวน 10,000 ต้น และจัดทำป้ายแทรกปักประจำต้นสัก เพื่อร่วมฟื้นฟูระบบนิเวศน์ผืนป่าต้นน้ำแม่ยม พร้อมระบบติดตามรายงานการดูแลรายต้นแบบตลอดชีวิต
-                </p>
-              </div>
-
-              {/* Perks List */}
-              <div className="space-y-3 border-t border-stone-200 pt-4 text-xs text-stone-700">
-                <div className="flex items-start gap-2.5">
-                  <div className="p-1 bg-emerald-50 text-emerald-700 rounded-lg mt-0.5 border border-emerald-100">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <strong className="text-stone-800">สายพันธุ์คัดพิเศษ ไม้สัก</strong>
-                    <p className="text-stone-500 mt-0.5 font-medium">คัดสรรกล้าไม้สักที่แข็งแรงสมบูรณ์สูงสุด มีอัตราการรอดชีวิตสูงกว่า 95%</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <div className="p-1 bg-emerald-50 text-emerald-700 rounded-lg mt-0.5 border border-emerald-100">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <strong className="text-stone-800">สลักหมายเลขกล้าสัก & ติดป้ายแทรกชื่อคุณ</strong>
-                    <p className="text-stone-500 mt-0.5 font-medium">ทุกต้นจะได้รับหมายเลขและติดตั้งป้ายแทรกสลักชื่อผู้ร่วมปลูก สามารถติดตามดูความสูงและภาพถ่ายได้ตลอดเวลา</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <div className="p-1 bg-emerald-50 text-emerald-700 rounded-lg mt-0.5 border border-emerald-100">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <strong className="text-stone-800">ดูแลถางหญ้าใส่ปุ๋ยบำรุง 1 ปี</strong>
-                    <p className="text-stone-500 mt-0.5 font-medium">ทีมเจ้าหน้าที่ป่าไม้และชุมชนท้องถิ่น คอยดูแลตัดวัชพืช รดน้ำ ใส่ปุ๋ยอินทรีย์ ป้องกันไฟป่า ให้ต้นกล้าเติบโตอย่างปลอดภัย</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Campaign Info Tag */}
-              <div className="bg-stone-50 p-4 rounded-2xl border border-stone-150 flex items-center justify-between shadow-sm">
-                <div>
-                  <p className="text-[10px] text-stone-500 font-mono">โครงการร่วมปลูกและลงทะเบียน</p>
-                  <p className="text-xs text-amber-700 font-bold">บันทึกข้อมูลกล้าในโครงการและป้ายแทรก</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xl font-black text-stone-900 font-mono">ฟรี</p>
-                  <p className="text-[10px] text-stone-500 font-medium">สมทบทุนจัดสรรเรียบร้อย</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Registration Form / Information Card */}
-            <form onSubmit={handleCreateOrder} className="md:col-span-3 bg-emerald-50/25 p-6 rounded-3xl border border-emerald-900/5 space-y-5 flex flex-col justify-between shadow-sm">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-stone-200">
-                  <Trees className="w-5 h-5 text-emerald-600" />
-                  <h3 className="font-semibold text-stone-800">ข้อมูลผู้รับใบประกาศเกียรติคุณ</h3>
-                </div>
-
-                {/* Mode Selector */}
-                {isAdmin ? (
-                  <div className="grid grid-cols-2 p-1 bg-stone-100 rounded-2xl border border-stone-200 shadow-inner">
-                    <button
-                      type="button"
-                      onClick={() => setIsMemberMode(false)}
-                      className={`py-2 text-xs font-bold rounded-xl transition cursor-pointer ${!isMemberMode ? 'bg-white text-emerald-850 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
-                    >
-                      🌱 บันทึกปลูกแอดมิน (ฟรี)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsMemberMode(true)}
-                      className={`py-2 text-xs font-bold rounded-xl transition cursor-pointer ${isMemberMode ? 'bg-emerald-600 text-white shadow-sm' : 'text-stone-500 hover:text-emerald-700'}`}
-                    >
-                      👑 สำหรับสมาชิก (100฿)
-                    </button>
-                  </div>
-                ) : (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-950 rounded-2xl text-xs font-bold text-center flex items-center justify-center gap-1.5 shadow-sm">
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span>คุณกำลังทำรายการในฐานะ สมาชิกโครงการ (โหมดพรีเมียม 100฿)</span>
-                  </div>
-                )}
-
-                {isMemberMode && (
-                  <div className="space-y-3 bg-gradient-to-br from-emerald-500/5 to-emerald-600/10 p-4 rounded-2xl border border-emerald-500/10 shadow-sm text-left">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-950">
-                      <Sparkles className="w-4 h-4 text-amber-500" />
-                      <span>โหมดร่วมปลูก (Joint Planting)</span>
-                    </div>
-                    <p className="text-[11px] text-stone-600 leading-normal">
-                      สลักชื่อของคุณบนป้ายพิเศษ ได้รับสิทธิ์ดูแลต้นไม้แบบพรีเมียม
-                    </p>
-                  </div>
-                )}
-
-                {/* Form Fields: Donor name */}
-                <div className="space-y-1">
-                  <label className="text-xs text-stone-500 font-semibold">ชื่อผู้ร่วมปลูก (สลักป้ายและใบประกาศ)</label>
-                  <input
-                    type="text"
-                    placeholder="ระบุชื่อจริงหรือชื่อของคุณ..."
-                    value={donorName}
-                    onChange={(e) => setDonorName(e.target.value)}
-                    className={`w-full bg-white border ${donorNameError ? 'border-red-500' : 'border-stone-200'} rounded-xl px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-emerald-600 transition`}
-                  />
-                  {donorNameError && (
-                    <p className="text-[10px] text-red-600">กรุณาระบุชื่อผู้ร่วมปลูกเพื่อสลักป้าย</p>
-                  )}
-                </div>
-
-                {/* Form Fields: Donor Organization (New) */}
-                <div className="space-y-1">
-                  <label className="text-xs text-stone-500 font-semibold flex items-center gap-1">
-                    <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>องค์กร / บริษัท / ชุมชน <span className="text-stone-400 font-normal">(ถ้ามี)</span></span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="ระบุชื่อองค์กร บริษัท หรือหน่วยงาน..."
-                    value={donorOrganization}
-                    onChange={(e) => setDonorOrganization(e.target.value)}
-                    className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-emerald-600 transition"
-                  />
-                </div>
-
-                {/* Form Fields: Contact info */}
-                <div className="space-y-1">
-                  <label className="text-xs text-stone-500 font-semibold">ช่องทางการติดต่อ (เบอร์โทรศัพท์)</label>
-                  <input
-                    type="tel"
-                    placeholder="เบอร์โทรศัพท์สำหรับการจัดส่งรายงาน..."
-                    value={donorPhone}
-                    onChange={(e) => setDonorPhone(e.target.value)}
-                    className={`w-full bg-white border ${donorPhoneError ? 'border-red-500' : 'border-stone-200'} rounded-xl px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-emerald-600 transition`}
-                  />
-                  {donorPhoneError && (
-                    <p className="text-[10px] text-red-600">กรุณาระบุช่องทางการติดต่อสำหรับรับใบประกาศ/รายงาน</p>
-                  )}
-                </div>
-
-                {/* 17 ร่วมปลูก option: Custom Individual Names per Seedling */}
-                {treeCount > 1 && (
-                  <div className="bg-white border border-emerald-900/10 rounded-2xl p-4 space-y-3 shadow-sm transition text-left">
-                    <div className="flex items-center justify-between">
-                      <div className="text-left">
-                        <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          ฟีเจอร์ผู้ร่วมปลูกหลายคน
-                        </span>
-                        <h4 className="text-xs font-bold text-stone-800 mt-1">กำหนดรายชื่อปลูกแยกรายต้น</h4>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={useSeparateNames}
-                          onChange={(e) => setUseSeparateNames(e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                      </label>
-                    </div>
-
-                    <p className="text-[10px] text-stone-500 leading-normal">
-                      กรณีระดมทุนอุปถัมภ์ร่วมกันในครอบครัวหรือกลุ่มเพื่อน คุณสามารถระบุชื่อที่สลักลงบนป้ายอลูมิเนียมของแต่ละต้นแยกกันได้เลยครับ (เช่น phong ปลูก 3 ต้น ระบุชื่อ phong, พรพรรณ, มงคล)
-                    </p>
-
-                    <AnimatePresence>
-                      {useSeparateNames && (
-                        <motion.div 
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="space-y-2 pt-2 border-t border-stone-100 overflow-hidden"
-                        >
-                          <span className="text-[10px] font-bold text-stone-400 block uppercase">รายชื่อสำหรับสลักบนต้นไม้สักแต่ละต้น:</span>
-                          <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                            {assignedIndexes.map((idx, index) => (
-                              <div key={idx} className="flex gap-2 items-center">
-                                <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
-                                  #{idx}
-                                </span>
-                                <input
-                                  type="text"
-                                  placeholder={`ระบุชื่อผู้ปลูกต้นที่ ${index + 1} (หากว่างจะใช้ชื่อ ${donorName || 'หลัก'})`}
-                                  value={separateNames[index] || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setSeparateNames(prev => {
-                                      const arr = [...prev];
-                                      arr[index] = val;
-                                      return arr;
-                                    });
-                                  }}
-                                  className="w-full bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-emerald-600 transition"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-
-                {/* Dynamic seedling selector depending on table selection */}
-                {preSelectedTreeIndexes && preSelectedTreeIndexes.length > 0 ? (
-                  // Customized display for pre-selected multiple seedlings
-                  <div className="space-y-3 bg-amber-50/60 border border-amber-100 rounded-xl p-4 mt-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-stone-500 font-semibold">จำนวนที่ร่วมปลูก:</span>
-                      <span className="text-sm font-black text-amber-700 font-mono">{preSelectedTreeIndexes.length} ต้น</span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-stone-500 uppercase font-mono block">หมายเลขกล้าที่ท่านเลือกจากตาราง:</span>
-                      <div className="flex flex-wrap gap-1 mt-1.5 max-h-[110px] overflow-y-auto">
-                        {preSelectedTreeIndexes.sort((a, b) => a - b).map((idx) => (
-                          <span key={idx} className="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-mono text-[10px] font-bold">
-                            #{idx}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-stone-200 flex justify-between items-center">
-                      <span className="text-[10px] text-stone-500">หากต้องการเปลี่ยนกล้า สามารถล้างเพื่อสุ่มได้</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPreSelectedTreeIndexes?.([]);
-                          setTreeCount(1);
-                        }}
-                        className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold underline transition"
-                      >
-                        เปลี่ยนเป็นแบบสุ่ม/ระบุเลขเอง
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  // Original selectors for quantity and single start index
-                  <>
-                    {/* Tree Counter selector */}
-                    <div className="space-y-1">
-                      <label className="text-xs text-stone-500 font-semibold block">จำนวนที่อยากปลูก</label>
-                      <select
-                        value={treeCount}
-                        onChange={(e) => setTreeCount(Number(e.target.value))}
-                        className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-900 focus:outline-none focus:border-emerald-600 transition cursor-pointer"
-                      >
-                        <option value={1}>1 ต้น</option>
-                        <option value={2}>2 ต้น</option>
-                        <option value={3}>3 ต้น</option>
-                        <option value={5}>5 ต้น</option>
-                        <option value={10}>10 ต้น</option>
-                        <option value={20}>20 ต้น</option>
-                        <option value={50}>50 ต้น</option>
-                        <option value={100}>100 ต้น</option>
-                      </select>
-                    </div>
-
-                    {/* Seedling Number range selector */}
-                    <div className="space-y-1.5 pt-1">
-                      <div className="flex justify-between items-center">
-                        <label className="text-xs text-stone-500 font-semibold">ระบุหมายเลขกล้าไม้สักที่ต้องการ (100001-110000)</label>
-                      </div>
-                      
-                      <div className="grid grid-cols-12 gap-2">
-                        <div className="col-span-6">
-                          <select
-                            value={selectedStartIndex}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              setSelectedStartIndex(val);
-                              setManualIndexInput(String(val));
-                            }}
-                            className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-emerald-600 transition font-mono cursor-pointer"
-                          >
-                            {availableChoices.map((idx) => (
-                              <option key={idx} value={idx}>
-                                กล้าสัก #{idx}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="col-span-6">
-                          <input
-                            type="text"
-                            placeholder="ระบุเลขอื่นเอง..."
-                            value={manualIndexInput}
-                            onChange={(e) => handleManualIndexChange(e.target.value)}
-                            className={`w-full bg-white border ${manualInputError ? 'border-red-500' : 'border-stone-200'} rounded-xl px-3 py-2.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-emerald-600 transition font-mono`}
-                          />
-                        </div>
-                      </div>
-
-                      {manualInputError && (
-                        <p className="text-[10px] text-red-600 mt-1">{manualInputError}</p>
-                      )}
-
-                      {/* Seedling Selection Preview Card */}
-                      <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 mt-1.5">
-                        <span className="text-[10px] text-stone-500 uppercase font-mono block">หมายเลขกล้าที่จะได้รับการปลูก ({assignedIndexes.length} ต้น):</span>
-                        <div className="flex flex-wrap gap-1 mt-1.5 max-h-[80px] overflow-y-auto">
-                          {assignedIndexes.map((idx) => (
-                            <span key={idx} className="bg-emerald-50 text-emerald-800 border border-emerald-100 px-2 py-0.5 rounded font-mono text-[10px] font-bold">
-                              #{idx}
-                            </span>
-                          ))}
-                        </div>
-                        {assignedIndexes.length < treeCount && (
-                          <p className="text-[9px] text-stone-500 mt-1">
-                            * ระบบสุ่มและจัดสรรกล้าที่ว่างให้ครบถ้วนตามความต้องการร่วมปลูกของคุณ
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Submit Panel */}
-              <div className="pt-4 border-t border-stone-200 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-left">
-                    <p className="text-[10px] text-stone-500 font-mono">
-                      {isMemberMode ? 'สมทบทุนช่วยปลูกโครงการพรีเมียม' : 'ลงทะเบียนป้ายแทรกฟรี'}
-                    </p>
-                    <p className="text-xs text-emerald-700 font-bold">
-                      {isMemberMode ? `ยอดชำระร่วมปลูก: ${treeCount * 100} บาท` : `สลักชื่อ: ${donorName || 'ผู้ร่วมปลูก'}`}
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmittingOrder}
-                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
-                  >
-                    {isSubmittingOrder ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        กำลังบันทึกข้อมูล...
-                      </>
-                    ) : (
-                      <>
-                        {isMemberMode ? (
-                          <>
-                            <QrCode className="w-4 h-4" />
-                            <span>ยืนยันข้อมูลและรับ QR Code ชำระเงิน ({treeCount * 100}฿)</span>
-                          </>
-                        ) : (
-                          <>
-                            <Trees className="w-4 h-4" />
-                            <span>บันทึกข้อมูลร่วมปลูก (ฟรี)</span>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {verifyError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium">
-                    {verifyError}
-                  </div>
-                )}
-              </div>
-            </form>
-          </motion.div>
-        ) : (
-          // STEP 2: QR Code Scan Pay & Verification (Styled for Light-Green Theme)
-          <motion.div
-            key="scan-pay"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="grid grid-cols-1 md:grid-cols-12 gap-8"
-          >
-            {/* PP QR Code Container */}
-            <div className="md:col-span-5 flex flex-col items-center text-center space-y-4">
-              <div className="flex flex-col gap-2 w-full max-w-sm mx-auto">
-                <button
-                  onClick={handleDownloadQR}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer border-none"
-                >
-                  <Download className="w-4 h-4" />
-                  ดาวน์โหลด QR Code สำหรับโอนเงิน
-                </button>
-                <a
-                  href="https://drive.google.com/file/d/1nLuLa-CAGaE4zW-JJdM5LwwH-UAxlEbn/view?usp=drivesdk"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold text-xs rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer text-center no-underline border-none"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  เปิดบัญชีรับเงิน QR จาก Google Drive
-                </a>
-              </div>
-
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 inline-block relative overflow-hidden">
-                {/* PromptPay Standard Logo banner mockup */}
-                <div className="bg-[#00a86b] text-white py-1 px-3 rounded-lg text-[9px] font-bold tracking-wider uppercase mb-3 flex items-center justify-center gap-1">
-                  <span className="text-white">●</span> KASIKORNBANK / กสิกรไทย
+          <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100 space-y-4">
+             <h3 className="font-bold text-emerald-900 flex items-center gap-2">
+               <Trees className="w-5 h-5 text-emerald-600" />
+               พิกัดที่คุณเลือก
+             </h3>
+             
+             {preSelectedTreeIndexes && preSelectedTreeIndexes.length > 0 ? (
+               <div className="flex flex-wrap gap-2">
+                 {preSelectedTreeIndexes.map(idx => (
+                   <span key={idx} className="bg-emerald-600 text-white pl-2.5 pr-1 py-1 rounded-lg text-xs font-mono font-bold shadow-sm flex items-center gap-1">
+                     #{idx}
+                     <button onClick={() => handleRemoveIndex(idx)} className="hover:bg-emerald-700 p-0.5 rounded-full" type="button">
+                        <X className="w-3 h-3" />
+                     </button>
+                   </span>
+                 ))}
+               </div>
+             ) : (
+               <p className="text-xs text-stone-500">
+                 คุณยังไม่ได้เลือกพิกัดจากแผนที่ ระบบจะทำการสุ่มพิกัดให้โดยอัตโนมัติ
+               </p>
+             )}
+             
+             <div className="pt-2 border-t border-emerald-200/50 space-y-3">
+                <div className="text-xs font-bold text-emerald-800">เลือกพิกัดเพิ่ม:</div>
+                <div className="flex gap-2">
+                   <select 
+                     className="flex-1 px-3 py-2 text-sm bg-white border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                     onChange={(e) => {
+                       const idx = parseInt(e.target.value);
+                       if (idx && !preSelectedTreeIndexes.includes(idx) && setPreSelectedTreeIndexes) {
+                          setPreSelectedTreeIndexes([...preSelectedTreeIndexes, idx]);
+                       }
+                       e.target.value = "";
+                     }}
+                   >
+                     <option value="">-- เลือกจากพิกัดที่ว่าง --</option>
+                     {availableOptions.map(opt => (
+                       <option key={opt} value={opt}>พิกัด #{opt}</option>
+                     ))}
+                   </select>
                 </div>
                 
-                <img
-                  src={qrCodeUrl}
-                  alt="PromptPay QR Code"
-                  className="w-full max-w-[240px] h-auto object-contain mx-auto"
-                  referrerPolicy="no-referrer"
-                />
-
-                <p className="text-[10px] text-stone-500 font-mono mt-3">
-                  สแกนจ่ายได้ด้วยทุกแอปธนาคารไทย (QR Thai Standard)
-                </p>
-              </div>
-
-              {/* Kasikorn Account Details Card */}
-              <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4 text-left space-y-2 w-full max-w-sm mx-auto shadow-sm">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-stone-500 font-medium">ธนาคาร:</span>
-                  <span className="text-stone-800 font-semibold font-mono">กสิกรไทย (KBank)</span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-stone-500 font-medium">เลขที่บัญชี:</span>
-                  <span className="text-emerald-700 font-bold font-mono">234-8-79081-4</span>
-                </div>
-                <div className="flex justify-between items-start text-xs">
-                  <span className="text-stone-500 font-medium min-w-[70px]">ชื่อบัญชี:</span>
-                  <span className="text-stone-800 font-semibold text-right">โครงการหมื่นกล้าป่าเขียว โดย นาย ปินะ ไชยบุตร</span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-stone-500 font-medium">เลขที่อ้างอิง:</span>
-                  <span className="text-stone-800 font-mono">004999246212814</span>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-xs text-stone-500">กรุณาสแกนโอนชำระเงินจำนวน</p>
-                <p className="text-2xl font-black text-stone-900 font-mono">
-                  {activeOrder.amount.toLocaleString()} <span className="text-sm text-emerald-600">฿</span>
-                </p>
-                <p className="text-[10px] text-stone-500 font-mono">
-                  (กล้าไม้สักจำนวน {activeOrder.treeCount} ต้น)
-                </p>
-              </div>
-
-              <button
-                onClick={() => setActiveOrder(null)}
-                className="text-xs text-stone-500 hover:text-stone-700 underline font-medium transition"
-              >
-                ย้อนกลับไปแก้ไขจำนวนกล้าสัก
-              </button>
-            </div>
-
-            {/* Line OA Slip Verification Box */}
-            <div className="md:col-span-7 flex flex-col justify-between space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-stone-200">
-                  <MessageCircle className="w-5 h-5 text-[#00B900]" />
-                  <h3 className="font-semibold text-stone-800">
-                    ยืนยันการโอนเงินผ่าน Line OA
-                  </h3>
-                </div>
-
-                <p className="text-sm text-stone-600 leading-relaxed">
-                  เมื่อท่านโอนเงินเรียบร้อยแล้ว <b>กรุณาส่งสลิปโอนเงินพร้อมแจ้งชื่อและเบอร์โทรศัพท์</b> เพื่อให้ทีมงานตรวจสอบความถูกต้องและรับใบประกาศเกียรติคุณได้ทาง Line Official
-                </p>
-
-                <div className="flex flex-col items-center justify-center p-6 bg-stone-50 border border-stone-200 rounded-2xl space-y-4">
-                  <img src="/line-oa-qr.png" alt="Line OA QR Code" className="w-40 h-auto object-contain rounded-xl shadow-sm" onError={(e) => { e.currentTarget.src = 'https://qr-official.line.me/gs/M_502xoloz_GW.png'; }} />
-                    
-                  <div className="flex flex-col w-full max-w-xs gap-3 mt-2">
-                    <a href="https://lin.ee/Sv5qrGD" target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-[#00B900] hover:bg-[#009900] text-white font-bold text-sm rounded-xl transition shadow-sm flex items-center justify-center gap-2 no-underline">
-                      <MessageCircle className="w-5 h-5" />
-                      เพิ่มเพื่อนและส่งสลิปผ่าน Line
-                    </a>
-                    <a href="https://www.facebook.com/profile.php?id=61591647386304" target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold text-sm rounded-xl transition shadow-sm flex items-center justify-center gap-2 no-underline">
-                      <ExternalLink className="w-5 h-5" />
-                      ติดตามแฟนเพจของเรา
-                    </a>
-                  </div>
-                </div>
-              </div>
-
-
-                
-              <div className="space-y-4 pt-4 border-t border-stone-200">
-                 <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl text-center">
-                   <h4 className="text-sm font-bold text-emerald-800 mb-2">ขั้นตอนต่อไป</h4>
-                   <p className="text-xs text-emerald-700 mb-4">
-                     หลังจากส่งสลิปผ่าน Line OA แอดมินจะตรวจสอบและยืนยันในระบบให้คุณ <br/>
-                     คุณสามารถนำ Order ID ไปตรวจสอบในเมนู <b>"แจ้งโอนเงิน/ยืนยันการซื้อ"</b> เพื่อเสร็จสิ้นกระบวนการ หรือรอแอดมินดำเนินการให้
-                   </p>
-                 </div>
-                   
-                 <div className="text-center mt-4">
-                   <button onClick={() => { setActiveOrder(null); }} className="px-6 py-2.5 bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold text-sm rounded-xl transition cursor-pointer">
-                     ปิดหน้าต่างนี้ (รอรับการตรวจสอบจาก Line OA)
+                <div className="flex gap-2">
+                   <input 
+                      type="number" 
+                      placeholder="หรือระบุเลข 100001..." 
+                      className="flex-1 px-3 py-2 text-sm bg-white border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      value={inputIndex}
+                      onChange={(e) => setInputIndex(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddIndex(); } }}
+                   />
+                   <button 
+                     type="button" 
+                     onClick={handleAddIndex}
+                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl flex items-center justify-center transition"
+                   >
+                     <Plus className="w-4 h-4" />
                    </button>
-                 </div>
-              </div>
+                </div>
+             </div>
+          </div>
+        </div>
 
-
+        <form onSubmit={handleSubmit} className="md:col-span-3 bg-white p-6 md:p-8 rounded-3xl border border-stone-200 shadow-xl space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wide">
+                ชื่อ - นามสกุล <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={donorName}
+                onChange={e => setDonorName(e.target.value)}
+                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition"
+                placeholder="ชื่อสำหรับสลักบนป้าย"
+              />
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      )}
+            
+            <div>
+              <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wide">
+                หน่วยงาน / องค์กร (ถ้ามี)
+              </label>
+              <input
+                type="text"
+                value={donorOrganization}
+                onChange={e => setDonorOrganization(e.target.value)}
+                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition"
+                placeholder="ชื่อองค์กร หรือ บริษัท"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wide">
+                ช่องทางติดต่อ (เบอร์โทรศัพท์ / Line ID) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={donorPhone}
+                onChange={e => setDonorPhone(e.target.value)}
+                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition"
+                placeholder="สำหรับใช้ยืนยันการรับเกียรติบัตร"
+              />
+            </div>
+
+            {(!preSelectedTreeIndexes || preSelectedTreeIndexes.length === 0) && (
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wide">
+                  จำนวนกล้าไม้ที่ต้องการอุปถัมภ์ (100฿ / ต้น) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={treeCount}
+                  onChange={e => setTreeCount(parseInt(e.target.value) || 1)}
+                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition font-mono"
+                />
+              </div>
+            )}
+          </div>
+
+          {errorMsg && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium">
+              {errorMsg}
+            </div>
+          )}
+
+          <div className="pt-4 border-t border-stone-100">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg rounded-2xl transition shadow-xl hover:scale-[1.02] flex items-center justify-center gap-2 disabled:opacity-70 disabled:hover:scale-100"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  กำลังดำเนินการ...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5 text-amber-300" />
+                  ลงทะเบียน
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </motion.div>
     </div>
   );
-}
+};
+
+export default PlantingPortal;

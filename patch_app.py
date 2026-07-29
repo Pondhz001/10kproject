@@ -3,70 +3,87 @@ import re
 with open("src/App.tsx", "r") as f:
     content = f.read()
 
-# Add import
-content = content.replace("import AdminDashboard from './components/AdminDashboard';", "import AdminDashboard from './components/AdminDashboard';\nimport VerifyPlanting from './components/VerifyPlanting';")
-
-# Add to activeTab types
-content = content.replace("'home' | 'map' | 'plant' | 'about' | 'my-trees' | 'admin-dashboard'", "'home' | 'map' | 'plant' | 'about' | 'my-trees' | 'admin-dashboard' | 'verify'")
-content = content.replace("<'home' | 'map' | 'plant' | 'about' | 'my-trees'>", "<'home' | 'map' | 'plant' | 'about' | 'my-trees' | 'admin-dashboard' | 'verify'>")
-content = content.replace("useState<'home' | 'map' | 'plant' | 'about' | 'my-trees'>('home');", "useState<'home' | 'map' | 'plant' | 'about' | 'my-trees' | 'admin-dashboard' | 'verify'>('home');")
-
-# Add the Verify tab to the header (Next to 'plant')
-verify_tab_html = """
-              <button
-                onClick={() => setActiveTab('verify')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === 'verify'
-                    ? 'bg-amber-500 text-stone-950 shadow-sm font-black'
-                    : 'text-stone-600 hover:text-amber-600 hover:bg-white/80'
+# 1. Replace the member and verify buttons in the nav
+old_nav = '''              <button
+                onClick={() => {
+                  setPlantMode('member');
+                  setPlantSubTab('new');
+                  setActiveTab('plant');
+                }}
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'new'
+                    ? 'bg-emerald-700 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
                 }`}
               >
-                <CheckCircle className={`w-4 h-4 ${activeTab === 'verify' ? 'text-stone-950' : 'text-amber-600'}`} />
-                ยืนยันการปลูก
+                <Sparkles className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'new' ? 'text-amber-300' : 'text-amber-500'}`} />
+                ร่วมปลูก (สมาชิก)
               </button>
-"""
-
-content = content.replace("""              <button
+              <button
                 onClick={() => {
                   setPlantMode('member');
+                  setPlantSubTab('verify');
                   setActiveTab('plant');
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === 'plant' && plantMode === 'member'
-                    ? 'bg-amber-500 text-stone-950 shadow-sm font-black border border-amber-400'
-                    : 'text-stone-600 hover:text-stone-900 hover:bg-white/80'
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'verify'
+                    ? 'bg-emerald-700 text-white shadow-sm font-black'
+                    : 'text-stone-600 hover:text-emerald-900 hover:bg-white/80'
                 }`}
               >
-                <Shovel className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' ? 'text-stone-950' : 'text-amber-700'}`} />
-                ร่วมปลูก (สมาชิก)
-              </button>""", """              <button
+                <CheckCircle className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'verify' ? 'text-amber-300' : 'text-emerald-600'}`} />
+                แจ้งโอนเงิน/ยืนยันการซื้อ
+              </button>'''
+
+new_nav = '''              <a
+                href="https://lin.ee/Sv5qrGD"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-black flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer bg-[#00B900] text-white shadow-md hover:bg-[#009900] hover:scale-105 no-underline"
+              >
+                <MessageCircle className="w-5 h-5 text-white animate-pulse" />
+                ร่วมปลูก (แอด Line OA)
+              </a>'''
+
+content = content.replace(old_nav, new_nav)
+
+
+# 2. Add member planting button to the Admin section
+old_admin_btn = '''              <button
                 onClick={() => {
-                  setPlantMode('member');
-                  setActiveTab('plant');
+                  checkAdminAndExecute(() => {
+                    setPlantMode('admin');
+                    setActiveTab('plant');
+                  });
+                }}'''
+
+new_admin_btn = '''              <button
+                onClick={() => {
+                  checkAdminAndExecute(() => {
+                    setPlantMode('member');
+                    setPlantSubTab('new');
+                    setActiveTab('plant');
+                  });
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === 'plant' && plantMode === 'member'
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'new'
                     ? 'bg-amber-500 text-stone-950 shadow-sm font-black border border-amber-400'
-                    : 'text-stone-600 hover:text-stone-900 hover:bg-white/80'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-100/50'
                 }`}
               >
-                <Shovel className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' ? 'text-stone-950' : 'text-amber-700'}`} />
-                ร่วมปลูก (สมาชิก)
-              </button>""" + "\n" + verify_tab_html)
+                <Sparkles className={`w-4 h-4 ${activeTab === 'plant' && plantMode === 'member' && plantSubTab === 'new' ? 'text-stone-950' : 'text-amber-700'}`} />
+                สร้างฟอร์ม (สมาชิก)
+              </button>
+              <button
+                onClick={() => {
+                  checkAdminAndExecute(() => {
+                    setPlantMode('admin');
+                    setActiveTab('plant');
+                  });
+                }}'''
 
-# Add component rendering
-verify_comp_html = """
-            {activeTab === 'verify' && (
-              <VerifyPlanting onVerified={() => setActiveTab('my-trees')} />
-            )}
-"""
-
-content = content.replace("""            {activeTab === 'about' && (
-              <AboutCampaign />
-            )}""", """            {activeTab === 'about' && (
-              <AboutCampaign />
-            )}""" + "\n" + verify_comp_html)
+content = content.replace(old_admin_btn, new_admin_btn)
 
 with open("src/App.tsx", "w") as f:
     f.write(content)
-print("Done App.tsx")
+print("App.tsx patched successfully.")

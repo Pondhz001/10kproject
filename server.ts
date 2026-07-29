@@ -9,16 +9,9 @@ import { CareUpdate, Tree } from './src/types';
 // Load environment variables
 dotenv.config();
 
-async function startServer() {
-  try {
-    await connectDB();
-    console.log("MongoDB Connection Initialized successfully");
-  } catch (err) {
-    console.error("Failed to connect to MongoDB on startup:", err);
-    process.exit(1);
-  }
-  const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+const app = express();
+connectDB().catch(console.error);
+  const PORT = 3000;
 
   // Initialize and ensure uploads directory exists
   const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -38,6 +31,14 @@ async function startServer() {
   // ==========================================
 
   // Health check
+  app.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('Surrogate-Control', 'no-store');
+    next();
+  });
+
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
@@ -477,11 +478,12 @@ async function startServer() {
   // ==========================================
 
   if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
+    createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
+    }).then(vite => {
+      app.use(vite.middlewares);
     });
-    app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
@@ -493,6 +495,7 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Muen Kla Pa Khiao Backend running on port ${PORT}`);
   });
-}
 
-startServer();
+export default app;
+
+

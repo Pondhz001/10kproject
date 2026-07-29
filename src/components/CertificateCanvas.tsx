@@ -135,7 +135,7 @@ export default function CertificateCanvas({ donorName, treeCount, selectedTreeIn
     // Location
     ctx.fillStyle = textGrayColor;
     ctx.font = "19px 'Thonburi', 'Sarabun', 'Georgia', 'Arial', sans-serif";
-    ctx.fillText('ณ สำนักวิปัสสนาทางสายเอก หลวงปู่มั่น ดอยนางเมาะ จ.เชียงใหม่', width / 2, 565);
+    ctx.fillText('ณ สำนักวิปัสสนาทางสายเอก หลวงปู่มั่น ดอยนางเมาะ ต.ออนใต้ อ.สันกำแพง จ.เชียงใหม่', width / 2, 565);
 
     // Blessing text (Traditional Thai blessing)
     ctx.fillStyle = '#555555';

@@ -3,11 +3,11 @@ import re
 with open("src/components/PlantingPortal.tsx", "r") as f:
     content = f.read()
 
-# Completely replacing PlantingPortal
-new_portal = """import React, { useState, useEffect } from 'react';
+new_portal = """import React, { useState, useEffect, useMemo } from 'react';
 import { Tree, Order } from '../types';
-import { MessageCircle, Copy, CheckCircle, Trees, Loader2, Sparkles, Map } from 'lucide-react';
+import { MessageCircle, Copy, CheckCircle, Trees, Loader2, Sparkles, Plus, X, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface PlantingPortalProps {
   onOrderCompleted: (order: Order, newTrees: Tree[]) => void;
@@ -22,6 +22,38 @@ interface PlantingPortalProps {
   onNavigateToMyTrees?: () => void;
   initialSubTab?: 'new' | 'verify';
 }
+
+const generatePromptPayPayload = (promptpayId: string, amount: number) => {
+  let payload = "00020101021129370016A000000677010111";
+  if (promptpayId.length === 10) {
+     payload += "01130066" + promptpayId.substring(1);
+  } else {
+     payload += "0213" + promptpayId;
+  }
+  payload += "5802TH5303764";
+  if (amount > 0) {
+      const amountStr = amount.toFixed(2);
+      payload += "54" + amountStr.length.toString().padStart(2, '0') + amountStr;
+  }
+  payload += "6304";
+  
+  const crc16 = (str: string) => {
+      let crc = 0xFFFF;
+      for (let i = 0; i < str.length; i++) {
+          crc ^= str.charCodeAt(i) << 8;
+          for (let j = 0; j < 8; j++) {
+              if ((crc & 0x8000) > 0) {
+                  crc = (crc << 1) ^ 0x1021;
+              } else {
+                  crc = crc << 1;
+              }
+          }
+      }
+      return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+  };
+  payload += crc16(payload);
+  return payload;
+};
 
 const PlantingPortal: React.FC<PlantingPortalProps> = ({ 
   onOrderCompleted,
@@ -39,12 +71,53 @@ const PlantingPortal: React.FC<PlantingPortalProps> = ({
   const [successOrder, setSuccessOrder] = useState<Order | null>(null);
   const [newlyPlantedTrees, setNewlyPlantedTrees] = useState<Tree[]>([]);
   const [copied, setCopied] = useState(false);
+  
+  const [inputIndex, setInputIndex] = useState('');
+
+  // 0888888888 can be replaced with actual promptpay phone number
+  const PROMPTPAY_ID = "0888888888"; 
 
   useEffect(() => {
     if (preSelectedTreeIndexes && preSelectedTreeIndexes.length > 0) {
       setTreeCount(preSelectedTreeIndexes.length);
     }
   }, [preSelectedTreeIndexes]);
+
+  const availableOptions = useMemo(() => {
+    const takenIndexes = new Set(trees.map(t => t.index));
+    const opts = [];
+    for (let i = 100001; i <= 110000 && opts.length < 50; i++) {
+      if (!takenIndexes.has(i) && !preSelectedTreeIndexes.includes(i)) {
+        opts.push(i);
+      }
+    }
+    return opts;
+  }, [trees, preSelectedTreeIndexes]);
+
+  const handleAddIndex = () => {
+    const idx = parseInt(inputIndex);
+    if (idx >= 100001 && idx <= 110000) {
+      if (trees.some(t => t.index === idx)) {
+        setErrorMsg(`พิกัดต้นไม้ #${idx} มีผู้อุปถัมภ์แล้ว`);
+      } else if (preSelectedTreeIndexes.includes(idx)) {
+        setErrorMsg(`คุณได้เลือกพิกัด #${idx} ไปแล้ว`);
+      } else {
+        if (setPreSelectedTreeIndexes) {
+          setPreSelectedTreeIndexes([...preSelectedTreeIndexes, idx]);
+        }
+        setInputIndex('');
+        setErrorMsg('');
+      }
+    } else {
+      setErrorMsg('หมายเลขต้นไม้ต้องอยู่ระหว่าง 100001 - 110000');
+    }
+  };
+
+  const handleRemoveIndex = (idx: number) => {
+    if (setPreSelectedTreeIndexes) {
+      setPreSelectedTreeIndexes(preSelectedTreeIndexes.filter(i => i !== idx));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,14 +161,7 @@ const PlantingPortal: React.FC<PlantingPortalProps> = ({
   const copyToClipboard = () => {
     if (!successOrder) return;
     const treeNumbers = newlyPlantedTrees.map(t => t.index).join(', ');
-    const text = `ขอร่วมอุปถัมภ์กล้าไม้ โครงการ 10K หมื่นกล้าป่าเขียว
-ชื่อ: ${successOrder.donorName}
-องค์กร: ${successOrder.donorOrganization || '-'}
-ติดต่อ: ${successOrder.donorPhone}
-จำนวน: ${successOrder.treeCount} ต้น (ยอดโอน ${successOrder.amount} บาท)
-พิกัดต้น: ${treeNumbers}
-
-(แนบสลิปการโอนเงินด้านล่างนี้ได้เลยครับ/ค่ะ)`;
+    const text = `ขอร่วมอุปถัมภ์กล้าไม้ โครงการ 10K หมื่นกล้าป่าเขียว\\nชื่อ: ${successOrder.donorName}\\nองค์กร: ${successOrder.donorOrganization || '-'}\\nติดต่อ: ${successOrder.donorPhone}\\nจำนวน: ${successOrder.treeCount} ต้น (ยอดโอน ${successOrder.amount} บาท)\\nพิกัดต้น: ${treeNumbers}\\n\\n(แนบสลิปการโอนเงินด้านล่างนี้ได้เลยครับ/ค่ะ)`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -103,6 +169,8 @@ const PlantingPortal: React.FC<PlantingPortalProps> = ({
   };
 
   if (successOrder) {
+    const qrPayload = generatePromptPayPayload(PROMPTPAY_ID, successOrder.amount);
+    
     return (
       <div className="max-w-2xl mx-auto space-y-8 pb-12 pt-4">
         <motion.div 
@@ -116,8 +184,19 @@ const PlantingPortal: React.FC<PlantingPortalProps> = ({
           <h2 className="text-2xl font-black text-emerald-950">ลงทะเบียนสำเร็จ!</h2>
           <p className="text-stone-600">
             ระบบได้บันทึกข้อมูลและจองพิกัดต้นไม้ของคุณเรียบร้อยแล้ว 
-            ขั้นตอนต่อไปกรุณาคัดลอกข้อมูลด้านล่างเพื่อส่งให้เจ้าหน้าที่ทาง Line พร้อมสลิปโอนเงิน
+            กรุณาสแกน QR Code ด้านล่างเพื่อชำระเงิน จากนั้นคัดลอกข้อมูลและส่งให้เจ้าหน้าที่ทาง Line พร้อมสลิปโอนเงิน
           </p>
+
+          <div className="flex flex-col items-center justify-center bg-stone-50 p-6 rounded-2xl border border-stone-200 space-y-4">
+            <h3 className="font-bold text-stone-800 flex items-center gap-2">
+               <QrCode className="w-5 h-5" /> 
+               สแกนเพื่อชำระเงิน ({successOrder.amount} บาท)
+            </h3>
+            <div className="p-4 bg-white rounded-xl shadow-sm border border-stone-100">
+               <QRCodeSVG value={qrPayload} size={180} />
+            </div>
+            <p className="text-xs text-stone-500">พร้อมเพย์: {PROMPTPAY_ID}</p>
+          </div>
 
           <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200 text-left font-mono text-sm text-stone-700 whitespace-pre-wrap relative">
             ขอร่วมอุปถัมภ์กล้าไม้ โครงการ 10K หมื่นกล้าป่าเขียว<br />
@@ -137,7 +216,7 @@ const PlantingPortal: React.FC<PlantingPortalProps> = ({
               }`}
             >
               {copied ? <CheckCircle className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-              {copied ? 'คัดลอกแล้ว' : 'คัดลอกข้อมูล'}
+              {copied ? 'คัดลอกแล้ว' : 'คัดลอกข้อมูลเพื่อส่ง Line'}
             </button>
             <a
               href="https://lin.ee/Sv5qrGD"
@@ -147,7 +226,7 @@ const PlantingPortal: React.FC<PlantingPortalProps> = ({
               onClick={() => onOrderCompleted(successOrder, newlyPlantedTrees)}
             >
               <MessageCircle className="w-6 h-6 animate-pulse" />
-              แอด Line เพื่อส่งข้อมูลและสลิป
+              แอด Line แจ้งชำระเงินพร้อมสลิป
             </a>
           </div>
         </motion.div>
@@ -177,11 +256,15 @@ const PlantingPortal: React.FC<PlantingPortalProps> = ({
                <Trees className="w-5 h-5 text-emerald-600" />
                พิกัดที่คุณเลือก
              </h3>
+             
              {preSelectedTreeIndexes && preSelectedTreeIndexes.length > 0 ? (
                <div className="flex flex-wrap gap-2">
                  {preSelectedTreeIndexes.map(idx => (
-                   <span key={idx} className="bg-emerald-600 text-white px-2.5 py-1 rounded-lg text-xs font-mono font-bold shadow-sm">
+                   <span key={idx} className="bg-emerald-600 text-white pl-2.5 pr-1 py-1 rounded-lg text-xs font-mono font-bold shadow-sm flex items-center gap-1">
                      #{idx}
+                     <button onClick={() => handleRemoveIndex(idx)} className="hover:bg-emerald-700 p-0.5 rounded-full" type="button">
+                        <X className="w-3 h-3" />
+                     </button>
                    </span>
                  ))}
                </div>
@@ -190,6 +273,45 @@ const PlantingPortal: React.FC<PlantingPortalProps> = ({
                  คุณยังไม่ได้เลือกพิกัดจากแผนที่ ระบบจะทำการสุ่มพิกัดให้โดยอัตโนมัติ
                </p>
              )}
+             
+             <div className="pt-2 border-t border-emerald-200/50 space-y-3">
+                <div className="text-xs font-bold text-emerald-800">เลือกพิกัดเพิ่ม:</div>
+                <div className="flex gap-2">
+                   <select 
+                     className="flex-1 px-3 py-2 text-sm bg-white border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                     onChange={(e) => {
+                       const idx = parseInt(e.target.value);
+                       if (idx && !preSelectedTreeIndexes.includes(idx) && setPreSelectedTreeIndexes) {
+                          setPreSelectedTreeIndexes([...preSelectedTreeIndexes, idx]);
+                       }
+                       e.target.value = "";
+                     }}
+                   >
+                     <option value="">-- เลือกจากพิกัดที่ว่าง --</option>
+                     {availableOptions.map(opt => (
+                       <option key={opt} value={opt}>พิกัด #{opt}</option>
+                     ))}
+                   </select>
+                </div>
+                
+                <div className="flex gap-2">
+                   <input 
+                      type="number" 
+                      placeholder="หรือระบุเลข 100001..." 
+                      className="flex-1 px-3 py-2 text-sm bg-white border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      value={inputIndex}
+                      onChange={(e) => setInputIndex(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddIndex(); } }}
+                   />
+                   <button 
+                     type="button" 
+                     onClick={handleAddIndex}
+                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl flex items-center justify-center transition"
+                   >
+                     <Plus className="w-4 h-4" />
+                   </button>
+                </div>
+             </div>
           </div>
         </div>
 

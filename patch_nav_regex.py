@@ -3,9 +3,23 @@ import re
 with open("src/App.tsx", "r") as f:
     content = f.read()
 
-pattern = r'<\s*button\s+onClick=\{\(\)\s*=>\s*\{\s*checkAdminAndExecute\(\(\)\s*=>\s*\{\s*setPlantMode\(\'member\'\).*?บันทึกปลูกแทน\s*</button>'
+# Match the two member buttons
+pattern1 = r'<\s*button\s+onClick=\{\(\)\s*=>\s*\{\s*setPlantMode\(\'member\'\);\s*setPlantSubTab\(\'new\'\);.*?แจ้งโอนเงิน/ยืนยันการซื้อ\s*</button>'
+replacement1 = '''<a
+                href="https://lin.ee/Sv5qrGD"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2.5 min-h-[44px] rounded-xl text-sm sm:text-xs font-black flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer bg-[#00B900] text-white shadow-md hover:bg-[#009900] hover:scale-105 no-underline"
+              >
+                <MessageCircle className="w-5 h-5 text-white animate-pulse" />
+                ร่วมปลูก (แอด Line OA)
+              </a>'''
 
-replacement = '''<button
+content = re.sub(pattern1, replacement1, content, flags=re.DOTALL)
+
+pattern2 = r'<\s*button\s+onClick=\{\(\)\s*=>\s*\{\s*checkAdminAndExecute\(\(\)\s*=>\s*\{\s*setPlantMode\(\'admin\'\);\s*setActiveTab\(\'plant\'\);\s*\}\);\s*\}\}.*?บันทึกปลูกแทน\s*</button>'
+
+replacement2 = '''<button
                 onClick={() => {
                   checkAdminAndExecute(() => {
                     setPlantMode('member');
@@ -39,7 +53,8 @@ replacement = '''<button
                 บันทึกปลูกแทน
               </button>'''
 
-new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+content = re.sub(pattern2, replacement2, content, flags=re.DOTALL)
 
 with open("src/App.tsx", "w") as f:
-    f.write(new_content)
+    f.write(content)
+print("Done regex patch.")
